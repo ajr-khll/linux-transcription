@@ -91,7 +91,13 @@ popover.menu contentbox {
   color: #d8d8d8;
 }
 
-.key-value  { color: #d8d8d8; }
+/* Sits inside the field frame, so it carries no border or background of its
+   own -- it should read as the value on the panel, not as a form control. */
+.key-entry  { color: #d8d8d8; background: transparent; border: none;
+              padding: 0; min-height: 0; caret-color: #ff6a6a; }
+.key-entry:disabled { color: #6a6a6a; }
+/* Empty and required: the one state where nothing works until it is filled. */
+.key-entry.needed { color: #ff6a6a; }
 .link       { color: #ff6a6a; font-size: 11px; background: transparent;
               border: none; padding: 0 4px; min-height: 0; }
 .link:hover { color: #ff9a9a; }

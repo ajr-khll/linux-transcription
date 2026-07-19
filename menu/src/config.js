@@ -27,7 +27,7 @@ export function defaults() {
     return {
         hotkey: "KEY_RIGHTCTRL",
         source: "",
-        endpoint_url: "http://127.0.0.1:8080/v1",
+        endpoint_url: "https://api.openai.com/v1",
         model: "whisper-1",
         api_key: "",
         backend: "auto",
@@ -86,10 +86,12 @@ history = ${cfg.history}
 # empty = ~/.local/share/whisprd/transcriptions
 history_dir = ${cfg.history_dir}
 
-# --- inference endpoint (cloud vs local is JUST this URL) ---
-endpoint_url = ${cfg.endpoint_url}
-model        = ${cfg.model}
+# --- openai ---
+# Required. Get one at https://platform.openai.com/api-keys
+# $OPENAI_API_KEY in the environment overrides this.
 api_key      = ${cfg.api_key}
+model        = ${cfg.model}
+endpoint_url = ${cfg.endpoint_url}
 
 # --- injection ---
 # backend = auto | wlr-vk | uinput | clipboard

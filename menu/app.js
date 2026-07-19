@@ -87,13 +87,14 @@ function select(items, active, onChange) {
     return dd;
 }
 
-/* The daemon speaks one protocol: OpenAI-compatible multipart to endpoint_url
- * (src/transcribe.c). The mock's deepgram/assemblyai entries would fail
- * outright, so these presets are the ones that actually work. */
-const ENDPOINTS = [
-    { text: "localhost:8080 — whisper.cpp", url: "http://127.0.0.1:8080/v1", model: "whisper-1" },
-    { text: "localhost:9000 — whisper.cpp", url: "http://127.0.0.1:9000/v1", model: "whisper-1" },
-    { text: "openai / whisper-1",           url: "https://api.openai.com/v1", model: "whisper-1" },
+/* OpenAI transcription models. The endpoint itself is no longer a choice --
+ * endpoint_url still exists in config.ini for anyone pointing this at an
+ * OpenAI-compatible server, but it is not a supported path, so the panel
+ * selects the model and leaves the URL alone. */
+const MODELS = [
+    { text: "whisper-1",             model: "whisper-1" },
+    { text: "gpt-4o-transcribe",     model: "gpt-4o-transcribe" },
+    { text: "gpt-4o-mini-transcribe", model: "gpt-4o-mini-transcribe" },
 ];
 
 const LAYOUTS = [
@@ -113,6 +114,9 @@ const MODS = [
 /* ---- state ---------------------------------------------------------- */
 
 const cfg = Config.load();
+/* The daemon prefers OPENAI_API_KEY over the file, so when it is set the panel
+ * must not present the file's value as the one in use -- it isn't. */
+const envKey = GLib.getenv("OPENAI_API_KEY") ?? "";
 let srcList = [];
 let recording = false;
 let keyShown = false;
@@ -120,7 +124,7 @@ let meterValues = new Array(BARS).fill(0);
 
 let win, feed, levelMeter;
 let statusDot, statusTxt, chipRow, setBtn, meter;
-let keyLabel, keyToggle, cursor, feedBox;
+let keyEntry, keyToggle, cursor, feedBox;
 let sessBox, countLabel, emptyNote;
 let sessRows = [];          /* [{ entry, widget }] in display order */
 let selected = 0;
@@ -177,13 +181,20 @@ function captureCombo(keyval, state) {
 
 /* ---- api key --------------------------------------------------------- */
 
+/* The key is required, so this has to be enterable, not just readable. GTK's
+ * own visibility flag does the masking -- rendering bullets by hand would mean
+ * holding the real value somewhere else and writing it back on every edit. */
 function renderKey() {
-    /* Never logged, only rendered -- and masked unless explicitly revealed. */
-    const k = cfg.api_key ?? "";
-    keyLabel.set_label(!k.length ? "(unset — local endpoint)"
-                                 : keyShown ? k : "•".repeat(Math.min(k.length, 28)));
+    keyEntry.set_visibility(keyShown);
     keyToggle.set_label(keyShown ? "[hide]" : "[show]");
-    keyToggle.set_visible(k.length > 0);
+
+    const fromEnv = envKey.length > 0;
+    keyEntry.set_sensitive(!fromEnv);
+    keyEntry.set_placeholder_text(fromEnv ? "set by OPENAI_API_KEY" : "sk-…");
+    /* An empty key is the one state where nothing works at all, so it reads as
+     * a prompt rather than as an ordinary blank field. */
+    if (!fromEnv && !(cfg.api_key ?? "").length) keyEntry.add_css_class("needed");
+    else keyEntry.remove_css_class("needed");
 }
 
 /* ---- live feed ------------------------------------------------------- */
@@ -261,16 +272,40 @@ function buildLeft() {
         persist();
     });
 
-    /* endpoint */
-    const epIdx = Math.max(0, ENDPOINTS.findIndex(e => e.url === cfg.endpoint_url));
-    const epSel = select(ENDPOINTS.map(e => e.text), epIdx, i => {
-        cfg.endpoint_url = ENDPOINTS[i].url;
-        cfg.model = ENDPOINTS[i].model;
+    /* model */
+    const mdIdx = Math.max(0, MODELS.findIndex(m => m.model === cfg.model));
+    const mdSel = select(MODELS.map(m => m.text), mdIdx, i => {
+        cfg.model = MODELS[i].model;
         persist();
     });
 
     /* api_key */
-    keyLabel = label("", "key-value", { hexpand: true, ellipsize: Pango.EllipsizeMode.END });
+    keyEntry = new Gtk.Entry({
+        text: envKey.length ? "" : (cfg.api_key ?? ""),
+        visibility: false,
+        hexpand: true,
+        has_frame: false,
+        css_classes: ["key-entry"],
+    });
+    /* Saved on Enter and on focus-out, never per keystroke: persist() SIGHUPs
+     * the daemon, which tears the capture stack down and builds it back up --
+     * once per character would restart it fifty times for one paste. */
+    const commitKey = () => {
+        /* When the environment supplies the key the entry is blank and
+         * insensitive. Committing that blank would erase the key in the file
+         * -- which is still the value the daemon falls back to. */
+        if (envKey.length) return;
+        const v = keyEntry.get_text().trim();
+        if (v === (cfg.api_key ?? "")) return;
+        cfg.api_key = v;
+        persist();
+        renderKey();
+    };
+    keyEntry.connect("activate", commitKey);
+    const keyFocus = new Gtk.EventControllerFocus();
+    keyFocus.connect("leave", commitKey);
+    keyEntry.add_controller(keyFocus);
+
     keyToggle = new Gtk.Button({ label: "[show]", css_classes: ["link"], has_frame: false });
     keyToggle.connect("clicked", () => { keyShown = !keyShown; renderKey(); });
     renderKey();
@@ -288,8 +323,8 @@ function buildLeft() {
         header,
         field("─ hotkey ─", hotkeyRow),
         field("─ microphone ─", box("v", 7, null, [micSel, meter])),
-        field("─ endpoint ─", epSel),
-        field("─ api_key ─", box("h", 0, null, [keyLabel, keyToggle])),
+        field("─ model ─", mdSel),
+        field("─ api_key ─", box("h", 0, null, [keyEntry, keyToggle])),
         field("─ kb_layout ─", lySel),
     ]);
     settings.set_size_request(LEFT_W, -1);

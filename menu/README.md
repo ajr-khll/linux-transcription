@@ -175,15 +175,27 @@ That would not load: the daemon's parser (`src/config.c`) reads the INI keys
 `hotkey`, `endpoint_url`, `model`, `api_key`, `source`, `backend`, `layout`,
 `variant`, `paste_chord`. The panels map onto those.
 
-The API key is masked by default, revealed only via `[show]`, and never
-logged. The file is written `0600`.
+### The API key
 
-### Endpoint presets
+An editable entry, masked until `[show]`, never logged. The file is written
+`0600`.
 
-The mock offers `deepgram / nova-2` and `assemblyai`. The daemon speaks one
-protocol — OpenAI-compatible multipart to `endpoint_url` (`src/transcribe.c`) —
-so those would fail outright. The dropdown offers the presets that work: local
-whisper.cpp on :8080 or :9000, and OpenAI.
+It is saved on `Enter` and on focus-out, not per keystroke: saving runs
+`persist()`, which SIGHUPs the daemon and rebuilds its whole capture stack.
+Doing that once per character would restart the daemon fifty times for one
+pasted key.
+
+If `OPENAI_API_KEY` is set in the environment the field greys out and reads
+*set by OPENAI_API_KEY*, because the daemon prefers the environment over the
+file — showing the file's value there would name a key that is not the one in
+use.
+
+### Model presets
+
+The daemon speaks one protocol, OpenAI multipart to `endpoint_url`
+(`src/transcribe.c`), so the mock's `deepgram / nova-2` and `assemblyai` would
+fail outright. The endpoint is no longer a choice either; the dropdown selects
+the OpenAI model: `whisper-1`, `gpt-4o-transcribe`, `gpt-4o-mini-transcribe`.
 
 ### Hotkey capture
 
