@@ -1,3 +1,12 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (C) 2026 AJ Khullar
+ *
+ * whisprd -- hold-to-talk voice transcription for Linux.
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 3, as published
+ * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
+ * see the LICENSE file or <https://www.gnu.org/licenses/> for details.
+ */
 #include "audio.h"
 #include "log.h"
 
@@ -13,6 +22,10 @@
 #define PREROLL_MS     250
 #define PREROLL_N      (AUDIO_RATE * PREROLL_MS / 1000)
 #define MAX_UTTERANCE  (AUDIO_RATE * 120)       /* hard cap: 2 minutes */
+
+/* ~2% of full scale. A live mic in a quiet room sits well above this; an
+ * unplugged input's noise floor sits well below it. */
+#define SILENCE_PEAK   655
 
 static pa_simple      *stream;
 static queue          *out_queue;
@@ -86,6 +99,27 @@ static void utt_seal(void)
         return;
     }
 
+    /* Whisper answers silence with hallucinated caption boilerplate ("thanks
+     * for watching", stray copyright lines) rather than an empty string, so a
+     * dead capture source looks like a working one returning nonsense. Catch
+     * it here instead: below this level there is no speech to find, and the
+     * request would only cost money to get garbage back. */
+    int peak = 0;
+    for (size_t i = 0; i < utt_n; i++) {
+        int v = utt[i] < 0 ? -utt[i] : utt[i];
+        if (v > peak)
+            peak = v;
+    }
+    if (peak < SILENCE_PEAK) {
+        log_warn("utterance peaked at %.1f%% of full scale: treating as silence, "
+                 "not transcribing\n", peak / 327.68);
+        log_warn("if you were speaking, whisprd is on the wrong capture source; "
+                 "set 'source =' in the config (see: pactl list short sources)\n");
+        utt_n = 0;
+        return;
+    }
+    log_dbg("utterance peak %.1f%% of full scale\n", peak / 327.68);
+
     pcm_buffer *b = malloc(sizeof(*b));
     if (!b)
         return;
@@ -151,10 +185,13 @@ int audio_init(const config *cfg, queue *out)
     };
 
     int err;
-    stream = pa_simple_new(NULL, "whisprd", PA_STREAM_RECORD, NULL,
+    const char *dev = cfg->source[0] ? cfg->source : NULL;
+    stream = pa_simple_new(NULL, "whisprd", PA_STREAM_RECORD, dev,
                            "voice transcription", &ss, NULL, &attr, &err);
     if (!stream) {
-        log_err("cannot open capture stream: %s\n", pa_strerror(err));
+        log_err("cannot open capture stream%s%s: %s\n",
+                dev ? " on source " : "", dev ? dev : "", pa_strerror(err));
+        log_err("list available sources with: pactl list short sources\n");
         return -1;
     }
 

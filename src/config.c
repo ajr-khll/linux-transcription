@@ -1,3 +1,12 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (C) 2026 AJ Khullar
+ *
+ * whisprd -- hold-to-talk voice transcription for Linux.
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 3, as published
+ * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
+ * see the LICENSE file or <https://www.gnu.org/licenses/> for details.
+ */
 #include "config.h"
 #include "log.h"
 
@@ -102,6 +111,19 @@ static int parse_chord(const char *spec, int *key_out, int *mods, size_t *n_mods
     return 0;
 }
 
+void config_hotkey_desc(const config *cfg, char *buf, size_t n)
+{
+    size_t off = 0;
+    for (size_t i = 0; i < cfg->n_mods; i++) {
+        const char *m = libevdev_event_code_get_name(EV_KEY, (unsigned)cfg->mod_codes[i]);
+        off += (size_t)snprintf(buf + off, n - off, "%s+", m ? m : "?");
+        if (off >= n)
+            return;
+    }
+    const char *k = libevdev_event_code_get_name(EV_KEY, (unsigned)cfg->hotkey_code);
+    snprintf(buf + off, n - off, "%s", k ? k : "?");
+}
+
 static void default_path(char *out, size_t n)
 {
     const char *xdg = getenv("XDG_CONFIG_HOME");
@@ -165,6 +187,8 @@ int config_load(config *cfg, const char *path)
             snprintf(cfg->model, sizeof(cfg->model), "%s", val);
         } else if (strcmp(key, "api_key") == 0) {
             snprintf(cfg->api_key, sizeof(cfg->api_key), "%s", val);
+        } else if (strcmp(key, "source") == 0) {
+            snprintf(cfg->source, sizeof(cfg->source), "%s", val);
         } else if (strcmp(key, "backend") == 0) {
             snprintf(cfg->backend, sizeof(cfg->backend), "%s", val);
         } else if (strcmp(key, "layout") == 0) {

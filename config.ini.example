@@ -10,6 +10,14 @@ model        = whisper-1
 # api_key only needed for cloud; omit/empty for local server
 api_key      =
 
+# --- capture ---
+# pulse/pipewire source name; empty = system default.
+# List candidates with:  pactl list short sources
+# A wrong source here is the #1 cause of hallucinated transcripts -- Whisper
+# answers silence with caption boilerplate ("thanks for watching", stray
+# copyright lines) rather than an empty string.
+source =
+
 # --- injection ---
 # backend = auto | wlr-vk | clipboard
 backend = auto

@@ -1,3 +1,12 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+ * Copyright (C) 2026 AJ Khullar
+ *
+ * whisprd -- hold-to-talk voice transcription for Linux.
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 3, as published
+ * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
+ * see the LICENSE file or <https://www.gnu.org/licenses/> for details.
+ */
 #include "audio.h"
 #include "config.h"
 #include "injector.h"
@@ -87,6 +96,12 @@ int main(int argc, char **argv)
     if (config_load(&cfg, cfg_path) < 0)
         return 1;
 
+    /* Logged before anything can fail, so a permissions error still tells the
+     * user which key they were meant to be holding. */
+    char hotkey[128];
+    config_hotkey_desc(&cfg, hotkey, sizeof(hotkey));
+    log_info("hotkey: %s\n", hotkey);
+
     int rc = 1;
     pthread_t worker_thread;
     bool worker_started = false;
@@ -123,7 +138,7 @@ int main(int argc, char **argv)
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
 
-    log_info("ready; hold your hotkey to talk\n");
+    log_info("ready; hold %s to talk\n", hotkey);
     rc = input_run() < 0 ? 1 : 0;
     log_info("shutting down\n");
 

@@ -1,5 +1,14 @@
-# whisprd needs to read keyboards and create a virtual one, without root.
-# Install to /etc/udev/rules.d/, then: sudo udevadm control --reload && sudo udevadm trigger
-# You must also be in the 'input' group: sudo usermod -aG input $USER  (re-login after)
+# Most distributions (Fedora included) already ship these devices as root:input
+# with group access, in which case you do NOT need this file -- joining the
+# 'input' group is enough. Check first:
+#
+#   stat -c '%n %U:%G %a' /dev/uinput /dev/input/event0
+#
+# Install this only if the group is not 'input' or the mode denies group access:
+#   sudo cp udev/99-whisprd.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload && sudo udevadm trigger
+#
+# whisprd opens /dev/uinput write-only, so group write alone (mode 0620) is
+# already sufficient -- group read is not required.
 KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"
-SUBSYSTEM=="input", KERNEL=="event*", GROUP="input", MODE="0640"
+SUBSYSTEM=="input", KERNEL=="event*", GROUP="input", MODE="0660"

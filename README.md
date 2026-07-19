@@ -43,13 +43,17 @@ Build without the Wayland backend with `make WITH_WLR_VK=0`.
 
 whisprd reads `/dev/input/event*` and writes `/dev/uinput`. **Do not run it as root.**
 
+Most distributions already ship both as `root:input` with group access, so joining
+the `input` group is all that is needed:
+
 ```sh
-sudo cp udev/99-whisprd.rules /etc/udev/rules.d/
-sudo udevadm control --reload && sudo udevadm trigger
 sudo usermod -aG input $USER
+newgrp input        # applies to this shell now; otherwise log out and back in
 ```
 
-Log out and back in for the group change to apply.
+Verify with `stat -c '%n %U:%G %a' /dev/uinput /dev/input/event0`. If the group is
+not `input`, install `udev/99-whisprd.rules` — see the comments in that file.
+(whisprd opens `/dev/uinput` write-only, so the common `0620` mode is fine.)
 
 ## Configure
 
@@ -60,6 +64,32 @@ cp config.ini.example ~/.config/whisprd/config.ini
 
 See `config.ini.example`. The only setting that decides local vs cloud is
 `endpoint_url`; `api_key` is needed for the cloud and ignored locally.
+
+## Picking a microphone
+
+`source` selects the capture device; empty means the system default, which is
+often *not* the microphone you actually use.
+
+```sh
+pactl list short sources        # find yours
+```
+
+If transcripts come back as plausible-looking nonsense — `you`, `Thank you.`,
+`Subtitles by the Amara.org community`, a stray copyright line — you are almost
+certainly recording silence from the wrong source. Whisper does not return an
+empty string for silent audio; it emits caption boilerplate memorised from its
+training data. whisprd guards against this by refusing to transcribe any
+utterance peaking below 2% of full scale, and tells you the measured level.
+
+To check a source's level directly:
+
+```sh
+parec --device=SOURCE --format=s16le --rate=16000 --channels=1 --raw \
+  | head -c 64000 | od -An -td2 | awk '{for(i=1;i<=NF;i++)if(($i<0?-$i:$i)>m)m=$i>0?$i:-$i}END{print "peak:",m}'
+```
+
+A live mic in a quiet room reads in the thousands. An unplugged jack reads in
+the low hundreds — that is the noise floor, not audio.
 
 ## Run
 
@@ -104,3 +134,20 @@ Force one with `backend = wlr-vk | clipboard` in the config.
   carries a known name, which the input thread skips.
 - Utterances shorter than 100 ms are discarded as stray taps; the queue is bounded
   and drops oldest, so a slow endpoint can never stall capture.
+
+## License
+
+whisprd is licensed under the **GNU General Public License, version 3**. See
+`LICENSE` for the full text. Source files carry an `SPDX-License-Identifier:
+GPL-3.0-only` header.
+
+`protocol/virtual-keyboard-unstable-v1.xml` is vendored, not original to this
+project. It is MIT licensed (Kristian Høgsberg, Intel, Collabora, Purism) and
+retains its own copyright notice inline; MIT is GPL-compatible, so it may be
+redistributed as part of this tree.
+
+The libraries whisprd links (libevdev, libpulse, libcurl, wayland-client,
+libxkbcommon) are MIT or LGPL and compatible with GPLv3. One caveat worth
+knowing: libcurl is commonly built against OpenSSL, and OpenSSL 1.x's license is
+*not* GPL-compatible. OpenSSL 3.x is Apache-2.0 and is fine. Distributions still
+shipping libcurl linked to OpenSSL 1.x would need a linking exception.

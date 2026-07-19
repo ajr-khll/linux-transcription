@@ -7,6 +7,10 @@ WITH_WLR_VK ?= 1
 PKGS        := libevdev libpulse-simple libcurl
 CFLAGS      ?= -O2 -g
 CFLAGS      += -std=c11 -Wall -Wextra -Wno-unused-parameter -D_GNU_SOURCE -I$(BUILD)
+# Header dependency tracking. Without this, editing a header rebuilds nothing
+# that includes it, and a struct layout change silently yields object files
+# compiled against different definitions of the same struct.
+CFLAGS      += -MMD -MP
 LDLIBS      += -lpthread
 
 SRC := src/main.c src/config.c src/input.c src/audio.c src/transcribe.c \
@@ -64,6 +68,8 @@ $(PROTO_C): $(PROTO_XML)
 $(BUILD)/%.o: %.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+-include $(OBJ:.o=.d)
 
 clean:
 	rm -rf $(BUILD)
