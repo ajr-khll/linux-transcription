@@ -1,0 +1,23 @@
+#!/bin/sh
+# whisprd-menu launcher.
+#
+# gtk4-layer-shell must be loaded before libwayland-client or the layer
+# surface silently fails to initialise and the panel falls back to a normal
+# window. Under GJS the library is dlopen'd too late for the linker to get
+# this right, so it has to be preloaded.
+# See https://github.com/wmww/gtk4-layer-shell/blob/main/linking.md
+set -eu
+
+DIR="${WHISPRD_MENU_DIR:-$(dirname "$(readlink -f "$0")")}"
+
+for cand in /usr/lib64/libgtk4-layer-shell.so /usr/lib/libgtk4-layer-shell.so \
+            /usr/lib64/libgtk4-layer-shell.so.0 /usr/lib/libgtk4-layer-shell.so.0; do
+    [ -e "$cand" ] && { LS_LIB="$cand"; break; }
+done
+
+if [ -n "${LS_LIB:-}" ]; then
+    LD_PRELOAD="${LD_PRELOAD:+$LD_PRELOAD:}$LS_LIB"
+    export LD_PRELOAD
+fi
+
+exec gjs -m "$DIR/app.js" "$@"

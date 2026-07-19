@@ -1,0 +1,146 @@
+/* whisprd-menu -- design 4b.
+ * Palette and metrics are taken verbatim from the handoff spec; treat the
+ * hex values and px sizes here as the source of truth for the design. */
+
+/* GTK4 CSS has no variables, so the palette is repeated inline. Reference:
+ *   bg #0c0c0c   bars #151515
+ *   borders #2a2a2a / #333333 / #3a3a3a
+ *   text #c8c8c8 / #d8d8d8
+ *   dim #8a8a8a / #7a7a7a / #5a5a5a
+ *   accent #ff4b4b   lighter #ff6a6a / #ff9a9a */
+
+/* The window itself must be transparent for the corners to actually be cut:
+ * GTK paints the window background under everything, so a radius set here
+ * would be covered by an opaque rectangle. The background, border and radius
+ * live on .panel instead, and the corner is real. */
+window.whisprd-menu {
+  background-color: transparent;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  color: #c8c8c8;
+}
+
+.panel {
+  background-color: #0c0c0c;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+}
+
+/* The mock's title bar (three fake traffic lights + a centred path) was
+ * removed: this is a layer-shell surface with no window chrome, so the dots
+ * imitated controls that do not exist and could not be clicked. The path it
+ * carried now lives under the host header, where it is still true. */
+
+/* ---- left column: settings ---------------------------------------- */
+.settings {
+  padding: 13px;
+  border-right: 1px solid #2a2a2a;
+  border-radius: 8px 0 0 0;
+}
+.cfg-path { font-size: 11px; color: #5a5a5a; }
+.host        { color: #c8c8c8; }
+.host-domain { color: #5a5a5a; }
+.host-sep    { color: #5a5a5a; }
+.status-dot  { color: #ff4b4b; }
+.status-dot.idle { color: #5a5a5a; }
+
+/* Gtk.Frame renders its label overlapping the top border -- an HTML
+ * fieldset by another name, which is exactly what 4b draws. */
+frame.field                { border: 1px solid #333333; border-radius: 4px; }
+frame.field > box          { padding: 8px 10px; }
+frame.field > label.legend { color: #ff6a6a; font-size: 10px; }
+
+/* ---- controls ------------------------------------------------------ */
+.chip {
+  border: 1px solid #ff4b4b;
+  border-radius: 3px;
+  color: #ff6a6a;
+  background: transparent;
+  padding: 1px 6px;
+  font-size: 11px;
+}
+.chip-plus { color: #5a5a5a; font-size: 11px; }
+
+button.btn {
+  border: 1px solid #ff4b4b;
+  border-radius: 3px;
+  color: #ff4b4b;
+  background: transparent;
+  padding: 1px 8px;
+  font-size: 11px;
+  min-height: 0;
+}
+button.btn:hover     { background-color: rgba(255, 75, 75, 0.12); }
+button.btn.recording { background-color: #ff4b4b; color: #0c0c0c; }
+
+.awaiting { color: #ff9a9a; font-size: 11px; }
+
+dropdown.sel > button {
+  background: #0c0c0c;
+  border: 1px solid #333333;
+  border-radius: 2px;
+  color: #d8d8d8;
+  font-size: 12px;
+  padding: 2px 6px;
+  min-height: 0;
+}
+dropdown.sel > button:hover { border-color: #3a3a3a; }
+popover.menu contentbox {
+  background-color: #151515;
+  border: 1px solid #333333;
+  color: #d8d8d8;
+}
+
+.key-value  { color: #d8d8d8; }
+.link       { color: #ff6a6a; font-size: 11px; background: transparent;
+              border: none; padding: 0 4px; min-height: 0; }
+.link:hover { color: #ff9a9a; }
+
+/* ---- right column: history ---------------------------------------- */
+.history { padding: 13px; }
+.history-title  { color: #ff6a6a; }
+.history-grep   { color: #5a5a5a; }
+.history-count  { color: #7a7a7a; }
+.history-rule   { background-color: #1e1e1e; min-height: 1px; }
+
+.feed-cmd   { color: #5a5a5a; }
+.feed-ts    { color: #ff6a6a; }
+.feed-text  { color: #c8c8c8; }
+.feed-cursor          { color: #ff4b4b; }
+.feed-cursor.blink-off { opacity: 0; }
+
+.divider    { color: #3a3a3a; }
+.sess-time  { color: #ff6a6a; }
+.sess-name  { color: #d8d8d8; }
+.sess-words { color: #7a7a7a; }
+.sess-row          { border-radius: 3px; padding: 1px 4px; }
+.sess-row:hover    { background-color: #151515; }
+.sess-row.selected { background-color: #151515; }
+
+/* Revealed on hover. Built hidden rather than transparent so it cannot be
+ * clicked while invisible; deletion is one click with no confirmation, and
+ * the file goes to the trash rather than being unlinked. */
+button.del {
+  color: #5a5a5a;
+  background: transparent;
+  border: none;
+  padding: 0 4px;
+  min-height: 0;
+  min-width: 0;
+  font-size: 11px;
+}
+button.del:hover  { color: #ff4b4b; }
+button.del.failed { color: #ff9a9a; }
+
+.empty-note { color: #5a5a5a; font-size: 11px; }
+
+/* ---- footer -------------------------------------------------------- */
+.footer {
+  background-color: #151515;
+  border-top: 1px solid #2a2a2a;
+  border-radius: 0 0 8px 8px;
+  padding: 5px 10px;
+  font-size: 10.5px;
+  color: #8a8a8a;
+}
+.fkey { color: #ff4b4b; font-weight: bold; font-size: 10.5px; }

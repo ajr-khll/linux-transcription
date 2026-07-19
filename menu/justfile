@@ -1,0 +1,48 @@
+# whisprd-menu -- design 4b floating panel.
+# The app is GJS, so there is nothing to compile; these recipes cover
+# running, linting and installing it.
+
+prefix := env_var_or_default("PREFIX", "/usr/local")
+
+default: run
+
+# Run the panel from this directory.
+run:
+    ./whisprd-menu
+
+# Run without layer-shell, as a normal window (useful on X11 or for debugging
+# placement problems).
+run-windowed:
+    gjs -m app.js
+
+# Import-check every module without opening a window.
+check:
+    gjs -m check.js
+
+# What the panel needs at runtime. Astal and gtk4-layer-shell are already
+# present on this machine; the font is the one thing usually missing.
+deps:
+    @echo "checking runtime dependencies…"
+    @command -v gjs >/dev/null && echo "ok   gjs" || echo "MISSING gjs"
+    @test -e /usr/lib64/girepository-1.0/Astal-4.0.typelib \
+        && echo "ok   Astal-4.0" || echo "MISSING astal-gtk4"
+    @command -v pactl >/dev/null \
+        && echo "ok   pactl (capture device names)" \
+        || echo "MISSING pactl -> device selection falls back to labels only"
+    @test -e /usr/lib64/girepository-1.0/AstalCava-0.1.typelib \
+        && echo "ok   AstalCava (level meter)" || echo "MISSING astal-libs"
+    @test -e /usr/lib64/girepository-1.0/Gtk4LayerShell-1.0.typelib \
+        && echo "ok   Gtk4LayerShell" || echo "MISSING gtk4-layer-shell"
+    @fc-list | grep -qi "plex mono" \
+        && echo "ok   IBM Plex Mono" \
+        || echo "MISSING IBM Plex Mono  ->  sudo dnf install ibm-plex-mono-fonts"
+
+install:
+    install -d {{prefix}}/share/whisprd-menu/src
+    install -m644 app.js style.css {{prefix}}/share/whisprd-menu/
+    install -m644 src/*.js {{prefix}}/share/whisprd-menu/src/
+    install -Dm755 whisprd-menu {{prefix}}/bin/whisprd-menu
+    @echo "installed. set WHISPRD_MENU_DIR={{prefix}}/share/whisprd-menu if it cannot find app.js"
+
+uninstall:
+    rm -rf {{prefix}}/share/whisprd-menu {{prefix}}/bin/whisprd-menu
