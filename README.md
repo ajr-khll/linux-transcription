@@ -65,24 +65,26 @@ cp config.ini.example ~/.config/whisprd/config.ini
 See `config.ini.example`. The only setting that decides local vs cloud is
 `endpoint_url`; `api_key` is needed for the cloud and ignored locally.
 
-## Settings GUI
+## Settings panel
 
-`whisprd-gui` is a GTK4 settings window, built as a separate binary so the daemon
-itself has no GUI dependencies and still runs headless.
+`whisprd-menu` is the settings and transcript-history panel — a GJS + GTK4
+application under `menu/`. It does not compile and does not link against the
+daemon: the two share only `config.ini`, a `SIGHUP`, and the journal, so the
+daemon keeps no GUI dependencies and still runs headless.
 
 ```sh
-whisprd-gui        # or launch "whisprd" from your application menu
+whisprd-menu       # or launch "whisprd" from your application menu
 ```
 
-It edits `~/.config/whisprd/config.ini` and talks to no daemon. Two things in it
-are live and need no running whisprd:
+It edits `~/.config/whisprd/config.ini`, signals the daemon to re-read it, and
+shows a **level meter** on the selected capture source so you pick a microphone
+by watching the bar move rather than trusting a device name. With `history = on`
+it also lists past sessions.
 
-- a **level meter** on the selected capture source, so you pick a microphone by
-  watching the bar move rather than trusting a device name;
-- **Test injection**, which runs `whisprd --say` so you can confirm the injection
-  backend works without speaking.
+See `menu/README.md` for dependencies, compositor rules and key bindings.
 
-Build without it via `make WITH_GUI=0`.
+Three settings have no panel yet — `backend`, `paste_chord`, and the injection
+test — and are edited in `config.ini` directly. See `TODO.md`.
 
 ## Picking a microphone
 
@@ -143,6 +145,8 @@ Force one with `backend = wlr-vk | uinput | clipboard` in the config.
 - The clipboard backend overwrites the clipboard without restoring it.
 - A single `paste_chord` applies to every app, so a config tuned for terminals
   behaves oddly in GUI apps and vice versa.
+
+`TODO.md` has the full list, including what is missing before a release.
 
 ## Design notes
 

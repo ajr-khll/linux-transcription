@@ -209,8 +209,15 @@ uinput device, fresh config. `SIGINT`/`SIGTERM` still exit.
 - **Letter-spacing** on legends is a Pango attribute; GTK4 CSS has no
   `letter-spacing` property.
 
-## Relationship to `whisprd-gui`
+## Replaces `whisprd-gui`
 
-This is intended to replace the GTK4 `whisprd-gui` (`src/gui/`), which covers
-the same settings. Both are installed for now; once this reaches parity,
-`whisprd-gui` and its Makefile target should be removed.
+This took over from the GTK4 `whisprd-gui`, which has been removed along with
+`src/gui/` and the `WITH_GUI` build flag. It was a second editor of the same
+`config.ini` that rewrote the file from a fixed template with no `history` or
+`history_dir` field, so saving in it silently turned off transcript recording
+this panel had enabled.
+
+Three of its settings have no panel here yet — `backend`, `paste_chord`, and the
+`whisprd --say` injection test. The daemon still reads all three, and
+`src/config.js` keeps them in `KEYS[]` so they survive a save untouched; they
+just need hand-editing for now. See `TODO.md`.

@@ -103,7 +103,7 @@ paste_chord = ${cfg.paste_chord}
     f.replace_contents(new TextEncoder().encode(out), null, false,
                        Gio.FileCreateFlags.REPLACE_DESTINATION, null);
 
-    /* The file holds an API key. Owner-only, same as whisprd-gui does. */
+    /* The file holds an API key, so keep it to the owner. */
     GLib.chmod(p, 0o600);
     return p;
 }
