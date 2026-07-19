@@ -20,6 +20,16 @@ no panel, and the defaults are what most people want.
   speaking. The old GUI had a button for it; the CLI flag is unchanged. Worth
   a `[ test ]` button next to the backend dropdown.
 
+## The systemd unit and install.sh
+
+- `install.sh` covers dnf, apt and pacman. Anything else falls through with a
+  warning and relies on the build to name what is missing.
+- The unit is `WantedBy=graphical-session.target`, which GNOME and KDE reach
+  and bare Hyprland/sway/river frequently do not — `enable` then links a unit
+  nothing ever starts. `install.sh` detects this and prints the fix rather than
+  rewriting the unit, since `default.target` would start whisprd on TTY logins
+  too. A `uwsm`-aware unit, or a documented `exec-once`, is the real answer.
+
 ## Cost and failure, now that every utterance is a paid API call
 
 Going OpenAI-only turned three tolerable behaviours into ones that cost money

@@ -26,49 +26,90 @@ and unsupported here; see `endpoint_url` in `config.ini.example`.
 
 On GNOME/KDE Wayland, auto-detection lands on `uinput`.
 
-## Build
+## Install
+
+You need an OpenAI API key first — [platform.openai.com/api-keys][keys].
+whisprd will not start without one.
+
+[keys]: https://platform.openai.com/api-keys
+
+```sh
+git clone https://github.com/ajr-khll/linux-transcription
+cd linux-transcription
+./install.sh
+```
+
+The script installs dependencies (dnf/apt/pacman), builds, installs to
+`/usr/local`, adds you to the `input` group, seeds the config, asks for your
+key, and enables the systemd user service. **Log out and back in afterwards** —
+group membership is read when your session starts, so the service cannot open
+`/dev/uinput` until then.
+
+Then:
+
+```sh
+whisprd --list-sources     # pick a microphone, set `source` in the config
+whisprd --say "hello"      # test injection without speaking
+whisprd-menu               # settings and history panel
+```
+
+### By hand
 
 ```sh
 # Fedora
 sudo dnf install libevdev-devel pulseaudio-libs-devel libcurl-devel \
-                 libxkbcommon-devel wayland-devel wayland-protocols-devel
+                 libxkbcommon-devel wayland-devel wayland-protocols-devel \
+                 gjs gtk4 pulseaudio-utils ibm-plex-mono-fonts
 # Debian/Ubuntu
 sudo apt install libevdev-dev libpulse-dev libcurl4-openssl-dev \
-                 libxkbcommon-dev libwayland-dev
+                 libxkbcommon-dev libwayland-dev wayland-protocols \
+                 gjs libgtk-4-1 pulseaudio-utils fonts-ibm-plex
 
-make
-make test          # JSON + keymap round-trip tests; no network, no compositor
+make && make test
+sudo make install
+
+sudo usermod -aG input $USER            # then log out and back in
+mkdir -p ~/.config/whisprd && chmod 700 ~/.config/whisprd
+cp /usr/local/share/whisprd/config.ini.example ~/.config/whisprd/config.ini
+chmod 600 ~/.config/whisprd/config.ini  # it holds your API key
+$EDITOR ~/.config/whisprd/config.ini    # set api_key
+
+systemctl --user daemon-reload
+systemctl --user enable --now whisprd
 ```
 
-Build without the Wayland backend with `make WITH_WLR_VK=0`.
+`make WITH_WLR_VK=0` drops the Wayland backend; `make WITH_MENU=0` drops the panel.
 
-## Permissions
+### The service does not start
 
-whisprd reads `/dev/input/event*` and writes `/dev/uinput`. **Do not run it as root.**
-
-Most distributions already ship both as `root:input` with group access, so joining
-the `input` group is all that is needed:
+The unit is `WantedBy=graphical-session.target`. GNOME and KDE activate that
+reliably. Bare Hyprland, sway and river often never do, so `enable` links the
+unit and nothing ever starts it. Check with:
 
 ```sh
-sudo usermod -aG input $USER
-newgrp input        # applies to this shell now; otherwise log out and back in
+systemctl --user is-active graphical-session.target
 ```
 
-Verify with `stat -c '%n %U:%G %a' /dev/uinput /dev/input/event0`. If the group is
-not `input`, install `udev/99-whisprd.rules` — see the comments in that file.
+If that prints `inactive`, either launch your compositor under `uwsm`, or start
+whisprd from the compositor's own autostart —
+`exec-once = systemctl --user start whisprd` on Hyprland.
+
+### Permissions
+
+whisprd reads `/dev/input/event*` and writes `/dev/uinput`. **Do not run it as
+root.** Most distributions ship both as `root:input`, so joining the `input`
+group is enough. Verify with
+`stat -c '%n %U:%G %a' /dev/uinput /dev/input/event0`; if the group is not
+`input`, install `udev/99-whisprd.rules` — see the comments in that file.
 (whisprd opens `/dev/uinput` write-only, so the common `0620` mode is fine.)
 
 ## Configure
 
-```sh
-mkdir -p ~/.config/whisprd
-cp config.ini.example ~/.config/whisprd/config.ini
-```
+`~/.config/whisprd/config.ini`, mode `0600`. See `config.ini.example`.
 
-See `config.ini.example`. `api_key` is the only setting that is required —
-whisprd will not start without one. `OPENAI_API_KEY` in the environment
-overrides it; prefer that if you sync or back up your dotfiles, since a synced
-`0600` file is still a copy of your key on someone else's disk.
+`api_key` is the only setting that is required. `OPENAI_API_KEY` in the
+environment overrides it — prefer that if you sync or back up your dotfiles,
+since a synced `0600` file is still a copy of your key on someone else's disk.
 
 ## Settings panel
 
