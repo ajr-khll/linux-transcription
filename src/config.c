@@ -189,6 +189,8 @@ int config_load(config *cfg, const char *path)
             snprintf(cfg->api_key, sizeof(cfg->api_key), "%s", val);
         } else if (strcmp(key, "source") == 0) {
             snprintf(cfg->source, sizeof(cfg->source), "%s", val);
+        } else if (strcmp(key, "variant") == 0) {
+            snprintf(cfg->variant, sizeof(cfg->variant), "%s", val);
         } else if (strcmp(key, "backend") == 0) {
             snprintf(cfg->backend, sizeof(cfg->backend), "%s", val);
         } else if (strcmp(key, "layout") == 0) {

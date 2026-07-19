@@ -19,9 +19,12 @@ api_key      =
 source =
 
 # --- injection ---
-# backend = auto | wlr-vk | clipboard
+# backend = auto | wlr-vk | uinput | clipboard
 backend = auto
-# XKB layout name, reserved for the declared-layout uinput backend
+# XKB layout, used by the 'uinput' backend to work out which keycode and
+# modifier level produces each character. It MUST match your active layout.
 layout  = us
+# Optional XKB variant, e.g. "intl" for us(intl), "nodeadkeys" for de.
+variant =
 # paste chord for the clipboard backend
 paste_chord = ctrl+v          # terminals often need: ctrl+shift+v

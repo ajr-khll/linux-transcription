@@ -18,10 +18,10 @@ machine.
 | in-memory WAV + multipart POST + JSON parse | implemented |
 | `wlr-vk` backend (Hyprland/Sway/river/Wayfire) | implemented |
 | `clipboard` backend (universal fallback) | implemented |
-| `uinput-layout` backend (GNOME/KDE direct typing) | not yet |
+| `uinput-layout` backend (GNOME/KDE direct typing) | implemented |
 | `x11-xtest` backend (X11 direct typing) | not yet |
 
-On GNOME/KDE Wayland, auto-detection currently lands on `clipboard`.
+On GNOME/KDE Wayland, auto-detection lands on `uinput`.
 
 ## Build
 
@@ -109,14 +109,25 @@ Auto-detection picks the first backend that works, preferring direct typing:
   active layout is irrelevant and no modifier handling is needed. The manager global
   exists only on wlroots compositors and binds silently-absent elsewhere, so the
   probe walks the registry rather than trusting `XDG_SESSION_TYPE`.
+- **`uinput`** — direct typing where the virtual-keyboard protocol does not exist
+  (GNOME, KDE). uinput injects raw keycodes *below* the compositor, which then
+  interprets them through the user's active layout — so we ask libxkbcommon which
+  keycode and modifier level produces each character under the layout declared in
+  config, and emit that. The compositor applies the same layout on the way out and
+  the two cancel. Requires `layout` (and `variant`, if you use one) to match your
+  **active** layout; if you hotkey-switch layouts, use `clipboard` instead.
+  Characters no key can produce — curly quotes and em dashes, which Whisper does
+  emit — are dropped with a warning, since reaching them needs dead-key/compose
+  sequences this backend does not implement.
 - **`clipboard`** — sets the clipboard via `wl-copy` (or `xclip` on X11) and emits a
   paste chord through uinput. Layout-agnostic, works everywhere, at the cost of
   clobbering the clipboard. Terminals usually need `paste_chord = ctrl+shift+v`.
 
-Force one with `backend = wlr-vk | clipboard` in the config.
+Force one with `backend = wlr-vk | uinput | clipboard` in the config.
 
 ### Known gaps
 
+- The `uinput` backend drops characters that need dead-key or compose sequences.
 - The clipboard backend overwrites the clipboard without restoring it.
 - A single `paste_chord` applies to every app, so a config tuned for terminals
   behaves oddly in GUI apps and vice versa.

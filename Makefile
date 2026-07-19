@@ -3,6 +3,7 @@ BUILD       ?= build
 
 # Backends are opt-out so users only pull in what their session needs.
 WITH_WLR_VK ?= 1
+WITH_UINPUT_LAYOUT ?= 1
 
 PKGS        := libevdev libpulse-simple libcurl
 CFLAGS      ?= -O2 -g
@@ -21,6 +22,12 @@ PROTO_XML   := protocol/virtual-keyboard-unstable-v1.xml
 PROTO_H     := $(BUILD)/virtual-keyboard-unstable-v1-client-protocol.h
 PROTO_C     := $(BUILD)/virtual-keyboard-unstable-v1-protocol.c
 
+ifeq ($(WITH_UINPUT_LAYOUT),1)
+  PKGS   += xkbcommon
+  CFLAGS += -DWITH_UINPUT_LAYOUT
+  SRC    += src/backends/uinput_layout.c
+endif
+
 ifeq ($(WITH_WLR_VK),1)
   PKGS   += wayland-client xkbcommon
   CFLAGS += -DWITH_WLR_VK
@@ -28,6 +35,7 @@ ifeq ($(WITH_WLR_VK),1)
   GEN    := $(PROTO_C)
 endif
 
+PKGS := $(sort $(PKGS))
 CFLAGS += $(shell pkg-config --cflags $(PKGS))
 LDLIBS += $(shell pkg-config --libs $(PKGS))
 
@@ -41,15 +49,17 @@ all: $(BUILD)/whisprd
 # compositor nor a network: JSON unescaping, and whether the keymap we generate
 # actually produces the characters we meant.
 TEST_CFLAGS := -std=c11 -Wall -Wextra -Wno-unused-parameter -D_GNU_SOURCE \
-               -Isrc -I$(BUILD) $(shell pkg-config --cflags wayland-client xkbcommon)
+               -Isrc -I$(BUILD) $(shell pkg-config --cflags wayland-client xkbcommon libevdev)
 TEST_LIBS   := $(shell pkg-config --libs wayland-client xkbcommon)
 
 test: $(PROTO_H) $(PROTO_C)
 	@mkdir -p $(BUILD)
 	$(CC) $(TEST_CFLAGS) tests/test_json.c src/json_text.c -o $(BUILD)/test_json
 	$(CC) $(TEST_CFLAGS) -DWITH_WLR_VK tests/test_keymap.c $(PROTO_C) $(TEST_LIBS) -o $(BUILD)/test_keymap
+	$(CC) $(TEST_CFLAGS) -DWITH_UINPUT_LAYOUT tests/test_layout.c src/uinput_kbd.c src/config.c $(TEST_LIBS) $(shell pkg-config --libs libevdev) -o $(BUILD)/test_layout
 	@echo "--- json ---"   && $(BUILD)/test_json
 	@echo "--- keymap ---" && $(BUILD)/test_keymap
+	@echo "--- layout ---" && $(BUILD)/test_layout
 
 $(BUILD)/whisprd: $(OBJ)
 	$(CC) $(OBJ) $(LDFLAGS) $(LDLIBS) -o $@

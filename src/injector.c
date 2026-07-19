@@ -24,6 +24,9 @@ static const inject_backend *const candidates[] = {
 #ifdef WITH_WLR_VK
     &backend_wlr_vk,
 #endif
+#ifdef WITH_UINPUT_LAYOUT
+    &backend_uinput_layout,
+#endif
     &backend_clipboard,
 };
 

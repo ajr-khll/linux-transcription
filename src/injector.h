@@ -33,6 +33,9 @@ typedef struct {
 #ifdef WITH_WLR_VK
 extern const inject_backend backend_wlr_vk;
 #endif
+#ifdef WITH_UINPUT_LAYOUT
+extern const inject_backend backend_uinput_layout;
+#endif
 extern const inject_backend backend_clipboard;
 
 #endif

@@ -27,6 +27,7 @@ typedef struct {
 
     char backend[32];                   /* auto | wlr-vk | clipboard | x11 | uinput */
     char layout[64];                    /* xkb layout, for uinput-layout backend */
+    char variant[64];                   /* optional xkb variant, e.g. "intl" */
 
     int    paste_key;                   /* paste chord, already parsed */
     int    paste_mods[CFG_MAX_MODS];
