@@ -2,13 +2,23 @@
 # evdev key name to hold. Single key or "MOD+KEY".
 hotkey = KEY_RIGHTCTRL
 
-# --- inference endpoint (cloud vs local is JUST this URL) ---
-# local  (offline): http://127.0.0.1:8080/v1
-# cloud  (OpenAI):  https://api.openai.com/v1
-endpoint_url = http://127.0.0.1:8080/v1
-model        = whisper-1
-# api_key only needed for cloud; omit/empty for local server
+# --- openai ---
+# REQUIRED. whisprd will not start without a key.
+# Get one at https://platform.openai.com/api-keys
+#
+# $OPENAI_API_KEY in the environment overrides this line. Prefer that if you
+# sync or back up your dotfiles -- this file is 0600, but a synced 0600 file
+# is still a copy of your key on someone else's disk.
 api_key      =
+
+# whisper-1 | gpt-4o-transcribe | gpt-4o-mini-transcribe
+model        = whisper-1
+
+# Every utterance is uploaded to this endpoint. Changing it to an
+# OpenAI-compatible server (whisper.cpp and friends) does work -- the request
+# is the same multipart POST either way -- but it is not a supported or tested
+# path, so leave it alone unless you know what you are doing.
+endpoint_url = https://api.openai.com/v1
 
 # --- capture ---
 # pulse/pipewire source name; empty = system default.

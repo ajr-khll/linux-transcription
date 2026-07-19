@@ -143,11 +143,22 @@ static void default_path(char *out, size_t n)
         snprintf(out, n, "%s/.config/whisprd/config.ini", getenv("HOME") ? getenv("HOME") : ".");
 }
 
+/* The environment wins over the file. Keeping the key out of config.ini is the
+ * point: dotfiles get synced, backed up and occasionally committed, and a
+ * leaked OpenAI key costs real money. OPENAI_API_KEY is the name every other
+ * tool already uses, so an existing export needs no extra setup here. */
+static void apply_env_overrides(config *cfg)
+{
+    const char *key = getenv("OPENAI_API_KEY");
+    if (key && *key)
+        snprintf(cfg->api_key, sizeof(cfg->api_key), "%s", key);
+}
+
 int config_load(config *cfg, const char *path)
 {
     memset(cfg, 0, sizeof(*cfg));
     cfg->hotkey_code = KEY_RIGHTCTRL;
-    snprintf(cfg->endpoint_url, sizeof(cfg->endpoint_url), "http://127.0.0.1:8080/v1");
+    snprintf(cfg->endpoint_url, sizeof(cfg->endpoint_url), "https://api.openai.com/v1");
     snprintf(cfg->model, sizeof(cfg->model), "whisper-1");
     snprintf(cfg->backend, sizeof(cfg->backend), "auto");
     snprintf(cfg->layout, sizeof(cfg->layout), "us");
@@ -167,6 +178,7 @@ int config_load(config *cfg, const char *path)
     FILE *f = fopen(path, "r");
     if (!f) {
         log_info("no config at %s, using defaults\n", path);
+        apply_env_overrides(cfg);
         return 0;
     }
 
@@ -224,5 +236,6 @@ int config_load(config *cfg, const char *path)
     while (ulen > 0 && cfg->endpoint_url[ulen - 1] == '/')
         cfg->endpoint_url[--ulen] = '\0';
 
+    apply_env_overrides(cfg);
     return rc;
 }

@@ -101,17 +101,24 @@ int transcribe_init(const config *cfg)
 
     snprintf(url, sizeof(url), "%s/audio/transcriptions", cfg->endpoint_url);
 
-    /* Only the cloud needs auth; a local whisper-server rejects nothing. */
-    if (cfg->api_key[0]) {
-        char auth[320];
-        snprintf(auth, sizeof(auth), "Authorization: Bearer %s", cfg->api_key);
-        headers = curl_slist_append(headers, auth);
+    /* Refused here rather than at the first utterance. Without this the daemon
+     * starts, looks healthy, and only fails once the user has already spoken --
+     * as a 401 buried in the journal, long after they stopped watching. */
+    if (!cfg->api_key[0]) {
+        log_err("no API key. Set one of:\n"
+                "  api_key = sk-...   in ~/.config/whisprd/config.ini\n"
+                "  export OPENAI_API_KEY=sk-...   (takes precedence)\n"
+                "Get a key at https://platform.openai.com/api-keys\n");
+        return -1;
     }
+
+    char auth[320];
+    snprintf(auth, sizeof(auth), "Authorization: Bearer %s", cfg->api_key);
+    headers = curl_slist_append(headers, auth);
     /* libcurl otherwise waits for a 100-continue that some servers never send. */
     headers = curl_slist_append(headers, "Expect:");
 
-    log_info("endpoint %s (model %s, %s)\n", url, cfg->model,
-             cfg->api_key[0] ? "authenticated" : "no auth");
+    log_info("endpoint %s (model %s)\n", url, cfg->model);
     return 0;
 }
 

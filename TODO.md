@@ -20,6 +20,27 @@ no panel, and the defaults are what most people want.
   speaking. The old GUI had a button for it; the CLI flag is unchanged. Worth
   a `[ test ]` button next to the backend dropdown.
 
+## Cost and failure, now that every utterance is a paid API call
+
+Going OpenAI-only turned three tolerable behaviours into ones that cost money
+or lose work.
+
+- **No spend limit.** Nothing caps requests. A stuck hotkey, or a hotkey bound
+  to a key you actually type, uploads audio continuously and bills for it. The
+  100 ms minimum and the 2% silence guard help, but neither is a budget. A
+  daily request cap in the config would be a small change.
+- **A failed request loses the transcript.** `transcribe_pcm` logs the error
+  and returns NULL; the worker drops it. On a local server that meant a lost
+  utterance on a machine you controlled. Against a network endpoint it means
+  every flaky connection silently eats what you said. Retry twice with backoff
+  before giving up.
+- **The queue drops oldest at 4.** Fine when inference was local and fast.
+  A slow round-trip to OpenAI makes overflow much more likely, and the thing
+  discarded is speech the user has already produced.
+- **The key is logged nowhere, but it is in argv range.** `--say` and the
+  config path are fine, but anyone adding a debug print of the config struct
+  would leak the key into the journal. Worth a comment in `config.h`.
+
 ## Injection
 
 - The `uinput` backend drops characters needing dead-key or compose sequences.

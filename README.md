@@ -3,11 +3,14 @@
 Hold-to-talk voice transcription for Linux. Press and hold a key, speak, release —
 the text is typed into whatever window has focus.
 
-The daemon holds no model and does no inference. It captures 16 kHz mono audio and
-POSTs it to an OpenAI-compatible `/audio/transcriptions` endpoint. Whether that
-endpoint is a local `whisper-server` on `127.0.0.1` or the OpenAI API is a single
-config value — the code path is identical, and in local mode nothing leaves the
-machine.
+The daemon holds no model and does no inference. It captures 16 kHz mono audio
+and POSTs it to OpenAI's `/audio/transcriptions`. You supply an API key.
+
+**Everything you dictate is uploaded to OpenAI.** That is the whole design: this
+is a thin client, not a local transcriber. Do not dictate anything into it that
+you would not paste into a web form. Running against a local OpenAI-compatible
+server is possible — the request is identical either way — but it is untested
+and unsupported here; see `endpoint_url` in `config.ini.example`.
 
 ## Status
 
@@ -62,8 +65,10 @@ mkdir -p ~/.config/whisprd
 cp config.ini.example ~/.config/whisprd/config.ini
 ```
 
-See `config.ini.example`. The only setting that decides local vs cloud is
-`endpoint_url`; `api_key` is needed for the cloud and ignored locally.
+See `config.ini.example`. `api_key` is the only setting that is required —
+whisprd will not start without one. `OPENAI_API_KEY` in the environment
+overrides it; prefer that if you sync or back up your dotfiles, since a synced
+`0600` file is still a copy of your key on someone else's disk.
 
 ## Settings panel
 
