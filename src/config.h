@@ -44,4 +44,7 @@ int config_parse_key_name(const char *name);
 /* Renders the hotkey chord back into "KEY_LEFTALT+KEY_Z" form for logging. */
 void config_hotkey_desc(const config *cfg, char *buf, size_t n);
 
+/* Same, for the paste chord. */
+void config_paste_chord_desc(const config *cfg, char *buf, size_t n);
+
 #endif

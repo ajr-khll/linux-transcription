@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=whisprd
+GenericName=Voice Transcription Settings
+Comment=Configure hold-to-talk voice transcription
+Exec=whisprd-gui
+Icon=audio-input-microphone
+Terminal=false
+Categories=Utility;Settings;AudioVideo;
+Keywords=voice;speech;transcription;dictation;whisper;
+StartupWMClass=dev.whisprd.Settings

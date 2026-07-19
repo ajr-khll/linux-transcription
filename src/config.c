@@ -111,17 +111,27 @@ static int parse_chord(const char *spec, int *key_out, int *mods, size_t *n_mods
     return 0;
 }
 
-void config_hotkey_desc(const config *cfg, char *buf, size_t n)
+static void chord_desc(const int *mods, size_t n_mods, int key, char *buf, size_t n)
 {
     size_t off = 0;
-    for (size_t i = 0; i < cfg->n_mods; i++) {
-        const char *m = libevdev_event_code_get_name(EV_KEY, (unsigned)cfg->mod_codes[i]);
+    for (size_t i = 0; i < n_mods; i++) {
+        const char *m = libevdev_event_code_get_name(EV_KEY, (unsigned)mods[i]);
         off += (size_t)snprintf(buf + off, n - off, "%s+", m ? m : "?");
         if (off >= n)
             return;
     }
-    const char *k = libevdev_event_code_get_name(EV_KEY, (unsigned)cfg->hotkey_code);
+    const char *k = libevdev_event_code_get_name(EV_KEY, (unsigned)key);
     snprintf(buf + off, n - off, "%s", k ? k : "?");
+}
+
+void config_hotkey_desc(const config *cfg, char *buf, size_t n)
+{
+    chord_desc(cfg->mod_codes, cfg->n_mods, cfg->hotkey_code, buf, n);
+}
+
+void config_paste_chord_desc(const config *cfg, char *buf, size_t n)
+{
+    chord_desc(cfg->paste_mods, cfg->n_paste_mods, cfg->paste_key, buf, n);
 }
 
 static void default_path(char *out, size_t n)

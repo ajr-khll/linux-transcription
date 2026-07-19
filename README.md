@@ -65,13 +65,32 @@ cp config.ini.example ~/.config/whisprd/config.ini
 See `config.ini.example`. The only setting that decides local vs cloud is
 `endpoint_url`; `api_key` is needed for the cloud and ignored locally.
 
+## Settings GUI
+
+`whisprd-gui` is a GTK4 settings window, built as a separate binary so the daemon
+itself has no GUI dependencies and still runs headless.
+
+```sh
+whisprd-gui        # or launch "whisprd" from your application menu
+```
+
+It edits `~/.config/whisprd/config.ini` and talks to no daemon. Two things in it
+are live and need no running whisprd:
+
+- a **level meter** on the selected capture source, so you pick a microphone by
+  watching the bar move rather than trusting a device name;
+- **Test injection**, which runs `whisprd --say` so you can confirm the injection
+  backend works without speaking.
+
+Build without it via `make WITH_GUI=0`.
+
 ## Picking a microphone
 
 `source` selects the capture device; empty means the system default, which is
 often *not* the microphone you actually use.
 
 ```sh
-pactl list short sources        # find yours
+whisprd --list-sources          # samples each device and prints its peak level
 ```
 
 If transcripts come back as plausible-looking nonsense — `you`, `Thank you.`,
@@ -81,15 +100,8 @@ empty string for silent audio; it emits caption boilerplate memorised from its
 training data. whisprd guards against this by refusing to transcribe any
 utterance peaking below 2% of full scale, and tells you the measured level.
 
-To check a source's level directly:
-
-```sh
-parec --device=SOURCE --format=s16le --rate=16000 --channels=1 --raw \
-  | head -c 64000 | od -An -td2 | awk '{for(i=1;i<=NF;i++)if(($i<0?-$i:$i)>m)m=$i>0?$i:-$i}END{print "peak:",m}'
-```
-
-A live mic in a quiet room reads in the thousands. An unplugged jack reads in
-the low hundreds — that is the noise floor, not audio.
+A live microphone reads well above 2% of full scale; an unplugged jack sits
+below it, which is the noise floor rather than audio.
 
 ## Run
 

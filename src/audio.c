@@ -215,14 +215,8 @@ void audio_set_capturing(bool on)
 /* ---- source enumeration ------------------------------------------------ */
 
 typedef struct {
-    char name[256];
-    char desc[256];
-    bool monitor;
-} src_entry;
-
-typedef struct {
-    src_entry *v;
-    size_t     n, cap;
+    audio_source *v;
+    size_t        n, cap;
 } src_list;
 
 static void on_source(pa_context *c, const pa_source_info *i, int eol, void *user)
@@ -233,20 +227,19 @@ static void on_source(pa_context *c, const pa_source_info *i, int eol, void *use
         return;
     if (l->n == l->cap) {
         size_t cap = l->cap ? l->cap * 2 : 16;
-        src_entry *p = realloc(l->v, cap * sizeof(*p));
+        audio_source *p = realloc(l->v, cap * sizeof(*p));
         if (!p)
             return;
         l->v = p;
         l->cap = cap;
     }
-    src_entry *e = &l->v[l->n++];
+    audio_source *e = &l->v[l->n++];
     snprintf(e->name, sizeof(e->name), "%s", i->name ? i->name : "");
     snprintf(e->desc, sizeof(e->desc), "%s", i->description ? i->description : "");
     e->monitor = i->monitor_of_sink != PA_INVALID_INDEX;
 }
 
-/* Records briefly from one source and returns its peak, 0..32767, or -1. */
-static int measure_peak(const char *source, int ms)
+int audio_measure_peak(const char *source, int ms)
 {
     const pa_sample_spec ss = {
         .format = PA_SAMPLE_S16LE, .rate = AUDIO_RATE, .channels = 1,
@@ -273,16 +266,18 @@ static int measure_peak(const char *source, int ms)
     return peak;
 }
 
-int audio_list_sources(void)
+audio_source *audio_enumerate_sources(size_t *n_out)
 {
+    *n_out = 0;
+
     pa_mainloop *ml = pa_mainloop_new();
     if (!ml)
-        return -1;
+        return NULL;
     pa_context *ctx = pa_context_new(pa_mainloop_get_api(ml), "whisprd");
     if (!ctx || pa_context_connect(ctx, NULL, PA_CONTEXT_NOFLAGS, NULL) < 0) {
         log_err("cannot connect to the audio server\n");
         pa_mainloop_free(ml);
-        return -1;
+        return NULL;
     }
 
     for (;;) {
@@ -293,7 +288,7 @@ int audio_list_sources(void)
             log_err("audio server connection failed\n");
             pa_context_unref(ctx);
             pa_mainloop_free(ml);
-            return -1;
+            return NULL;
         }
         pa_mainloop_iterate(ml, 1, NULL);
     }
@@ -309,20 +304,30 @@ int audio_list_sources(void)
     pa_context_unref(ctx);
     pa_mainloop_free(ml);
 
+    *n_out = list.n;
+    return list.v;
+}
+
+int audio_list_sources(void)
+{
+    size_t n = 0;
+    audio_source *v = audio_enumerate_sources(&n);
+    if (!v)
+        return -1;
+
     printf("Sampling each source for 400 ms -- speak now to see your mic respond.\n\n");
     printf("%-6s %-9s %s\n", "PEAK", "KIND", "SOURCE");
 
-    for (size_t i = 0; i < list.n; i++) {
-        int peak = measure_peak(list.v[i].name, 400);
+    for (size_t i = 0; i < n; i++) {
+        int peak = audio_measure_peak(v[i].name, 400);
         char lvl[16];
         if (peak < 0)
             snprintf(lvl, sizeof(lvl), "  n/a");
         else
             snprintf(lvl, sizeof(lvl), "%4.1f%%", peak / 327.68);
 
-        printf("%-6s %-9s %s\n", lvl, list.v[i].monitor ? "monitor" : "input",
-               list.v[i].name);
-        printf("       %-9s %s\n", "", list.v[i].desc);
+        printf("%-6s %-9s %s\n", lvl, v[i].monitor ? "monitor" : "input", v[i].name);
+        printf("       %-9s %s\n", "", v[i].desc);
     }
 
     printf("\nPut the name of the source you want in config as:  source = <name>\n");
@@ -330,7 +335,7 @@ int audio_list_sources(void)
            SILENCE_PEAK / 327.68);
     printf("silence, and whisprd will refuse to transcribe from it.\n");
 
-    free(list.v);
+    free(v);
     return 0;
 }
 

@@ -26,6 +26,19 @@ void audio_set_capturing(bool on);
 
 void audio_shutdown(void);
 
+typedef struct {
+    char name[256];
+    char desc[256];
+    bool monitor;
+} audio_source;
+
+/* Returns a malloc'd array of capture sources; caller frees. */
+audio_source *audio_enumerate_sources(size_t *n_out);
+
+/* Records briefly from one source and returns its peak sample (0..32767),
+ * or -1 if the source could not be opened. */
+int audio_measure_peak(const char *source, int ms);
+
 /* Prints every capture source with a short live level measurement, so a user
  * can pick their microphone by watching which one actually responds rather
  * than guessing from device names. Returns 0 on success. */
