@@ -8,7 +8,11 @@
 # See https://github.com/wmww/gtk4-layer-shell/blob/main/linking.md
 set -eu
 
-DIR="${WHISPRD_MENU_DIR:-$(dirname "$(readlink -f "$0")")}"
+# @SHAREDIR@ is substituted at install time. Run from a source checkout it is
+# left as-is, has no app.js beside it, and the fallback finds the tree instead
+# -- so the same script works installed and in-place.
+DIR="${WHISPRD_MENU_DIR:-@SHAREDIR@}"
+[ -f "$DIR/app.js" ] || DIR="$(dirname "$(readlink -f "$0")")"
 
 for cand in /usr/lib64/libgtk4-layer-shell.so /usr/lib/libgtk4-layer-shell.so \
             /usr/lib64/libgtk4-layer-shell.so.0 /usr/lib/libgtk4-layer-shell.so.0; do

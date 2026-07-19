@@ -1,7 +1,7 @@
 # whisprd-menu
 
 Floating settings + history panel for the whisprd daemon — design `4b`, built
-on GJS + GTK4 + Astal.
+on GJS + GTK4.
 
 ```
 cd menu
@@ -13,21 +13,26 @@ make run       # open the panel
 
 ## Dependencies
 
-Everything except the font is already installed on this machine:
+The panel links against none of these — it shells out to all of them. Nothing
+here is discovered automatically, so a package has to name every one by hand.
 
 | | |
 |---|---|
-| `gjs` | GTK4 JavaScript runtime |
-| `astal-gtk4` | GTK4 widget layer |
+| `gjs`, `gtk4` | GTK4 JavaScript runtime |
 | `pactl`, `parec` | capture device names, level meter |
-| `gtk4-layer-shell` | only for `--layer` mode |
-| **IBM Plex Mono** | **not installed** — `sudo dnf install ibm-plex-mono-fonts` |
+| `journalctl`, `systemctl` | live feed, status, config reload |
+| `gtk4-layer-shell` | optional; only for `--layer` mode |
+| **IBM Plex Mono** | `sudo dnf install ibm-plex-mono-fonts` |
 
 Without the font the layout is correct but rendered in the wrong typeface.
 
+**Astal is not required.** `app.js` imports none of it, and `src/audio.js` treats
+`AstalWp` as an optional fallback for device names. This matters for packaging:
+the `astal*` packages live only in the `solopasha/hyprland` COPR, so depending
+on them would keep whisprd out of any ordinary repository.
+
 > Fedora's `dnf install ags` is **Adventure Game Studio**, an unrelated project
-> that happens to share the name. Aylur's shell is the `astal*` packages, from
-> the `solopasha/hyprland` COPR.
+> that happens to share the name.
 
 ## Compositor setup
 
@@ -208,6 +213,13 @@ uinput device, fresh config. `SIGINT`/`SIGTERM` still exit.
   would have called it.
 - **Letter-spacing** on legends is a Pango attribute; GTK4 CSS has no
   `letter-spacing` property.
+
+## Installing
+
+`make install` from the top level installs the daemon and this panel together;
+`make WITH_MENU=0` leaves the panel out. Either way the launcher is rewritten on
+the way past to point at `$(PREFIX)/share/whisprd-menu`, since `app.js` no
+longer sits beside it once it lands in `bin/`. `WHISPRD_MENU_DIR` overrides it.
 
 ## Replaces `whisprd-gui`
 

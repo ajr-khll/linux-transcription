@@ -19,13 +19,16 @@ run-windowed:
 check:
     gjs -m check.js
 
-# What the panel needs at runtime. Astal and gtk4-layer-shell are already
-# present on this machine; the font is the one thing usually missing.
+# What the panel needs at runtime. It links against none of this -- it shells
+# out to all of it -- so nothing here is found automatically and a package has
+# to declare it by hand. Astal is deliberately absent: app.js imports none of
+# it, and depending on it would tie the package to a COPR for no gain.
 deps:
     @echo "checking runtime dependencies…"
     @command -v gjs >/dev/null && echo "ok   gjs" || echo "MISSING gjs"
-    @test -e /usr/lib64/girepository-1.0/Astal-4.0.typelib \
-        && echo "ok   Astal-4.0" || echo "MISSING astal-gtk4"
+    @command -v journalctl >/dev/null \
+        && echo "ok   journalctl (live transcript feed)" \
+        || echo "MISSING journalctl -> no live feed"
     @command -v pactl >/dev/null \
         && echo "ok   pactl (capture device names)" \
         || echo "MISSING pactl -> device selection falls back to labels only"
@@ -33,17 +36,21 @@ deps:
         && echo "ok   parec (level meter)" \
         || echo "MISSING parec -> the level meter stays flat"
     @test -e /usr/lib64/girepository-1.0/Gtk4LayerShell-1.0.typelib \
-        && echo "ok   Gtk4LayerShell" || echo "MISSING gtk4-layer-shell"
+        && echo "ok   Gtk4LayerShell (optional, --layer only)" \
+        || echo "absent  gtk4-layer-shell -> --layer falls back to a window"
     @fc-list | grep -qi "plex mono" \
         && echo "ok   IBM Plex Mono" \
         || echo "MISSING IBM Plex Mono  ->  sudo dnf install ibm-plex-mono-fonts"
 
+# The launcher finds app.js beside itself, which stops being true the moment it
+# lands in bin/ -- so point it at the install prefix on the way past.
 install:
     install -d {{prefix}}/share/whisprd-menu/src
     install -m644 app.js style.css {{prefix}}/share/whisprd-menu/
     install -m644 src/*.js {{prefix}}/share/whisprd-menu/src/
-    install -Dm755 whisprd-menu {{prefix}}/bin/whisprd-menu
-    @echo "installed. set WHISPRD_MENU_DIR={{prefix}}/share/whisprd-menu if it cannot find app.js"
+    install -d {{prefix}}/bin
+    sed 's|@SHAREDIR@|{{prefix}}/share/whisprd-menu|' whisprd-menu > {{prefix}}/bin/whisprd-menu
+    chmod 755 {{prefix}}/bin/whisprd-menu
 
 uninstall:
     rm -rf {{prefix}}/share/whisprd-menu {{prefix}}/bin/whisprd-menu

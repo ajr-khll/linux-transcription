@@ -82,6 +82,7 @@ by watching the bar move rather than trusting a device name. With `history = on`
 it also lists past sessions.
 
 See `menu/README.md` for dependencies, compositor rules and key bindings.
+Install without it via `make WITH_MENU=0`.
 
 Three settings have no panel yet — `backend`, `paste_chord`, and the injection
 test — and are edited in `config.ini` directly. See `TODO.md`.

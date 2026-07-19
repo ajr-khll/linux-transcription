@@ -5,6 +5,10 @@ BUILD       ?= build
 # Backends are opt-out so users only pull in what their session needs.
 WITH_WLR_VK ?= 1
 WITH_UINPUT_LAYOUT ?= 1
+# The settings UI is whisprd-menu (menu/), a separate GJS application. It does
+# not compile and does not link against the daemon -- they share only
+# config.ini, SIGHUP and the journal -- so it installs rather than builds.
+WITH_MENU   ?= 1
 
 PKGS        := libevdev libpulse-simple libcurl
 CFLAGS      ?= -O2 -g
@@ -92,8 +96,15 @@ install: all
 	# ship a broken unit for any non-default PREFIX.
 	sed 's|@BINDIR@|$(PREFIX)/bin|' systemd/whisprd.service.in > $(BUILD)/whisprd.service
 	install -Dm644 $(BUILD)/whisprd.service $(DESTDIR)$(PREFIX)/lib/systemd/user/whisprd.service
+ifeq ($(WITH_MENU),1)
+	$(MAKE) -C menu install PREFIX=$(PREFIX) DESTDIR=$(DESTDIR)
+	install -Dm644 desktop/dev.whisprd.Menu.desktop \
+	    $(DESTDIR)$(PREFIX)/share/applications/dev.whisprd.Menu.desktop
+endif
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/whisprd
+	rm -f $(DESTDIR)$(PREFIX)/share/applications/dev.whisprd.Menu.desktop
 	rm -f $(DESTDIR)$(PREFIX)/lib/systemd/user/whisprd.service
 	rm -rf $(DESTDIR)$(PREFIX)/share/whisprd
+	$(MAKE) -C menu uninstall PREFIX=$(PREFIX) DESTDIR=$(DESTDIR)
