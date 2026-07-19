@@ -18,6 +18,17 @@ api_key      =
 # copyright lines) rather than an empty string.
 source =
 
+# --- history ---
+# on = append every transcript to a session file, which is what the menu's
+# session list reads. Off by default: this is a verbatim record of everything
+# spoken at the machine, so it is opt-in rather than something to discover
+# later. Files are 0600 in a 0700 directory.
+# Consecutive utterances share a file until 5 minutes of silence starts a new
+# one; the file is named after the first thing said in it.
+history = off
+# empty = ~/.local/share/whisprd/transcriptions (honours XDG_DATA_HOME)
+history_dir =
+
 # --- injection ---
 # backend = auto | wlr-vk | uinput | clipboard
 backend = auto

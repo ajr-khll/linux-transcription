@@ -9,6 +9,7 @@
  */
 #include "audio.h"
 #include "config.h"
+#include "history.h"
 #include "injector.h"
 #include "input.h"
 #include "log.h"
@@ -56,6 +57,9 @@ static void *worker(void *arg)
 
         if (*start) {
             log_info("transcript: %s\n", start);
+            /* Recorded before injection so a failing backend still leaves the
+             * transcript somewhere the user can get at it. */
+            history_append(start);
             if (!print_only && injector_send(inj, start) < 0)
                 log_err("injection failed\n");
         }
@@ -63,9 +67,14 @@ static void *worker(void *arg)
     }
 }
 
+/* Set from the SIGHUP handler; read by main to decide whether to re-enter the
+ * setup loop or exit. sig_atomic_t is the only type safe to touch here. */
+static volatile sig_atomic_t reload_requested;
+
 static void on_signal(int sig)
 {
-    (void)sig;
+    if (sig == SIGHUP)
+        reload_requested = 1;
     input_stop();                       /* write() is async-signal-safe */
 }
 
@@ -135,61 +144,93 @@ int main(int argc, char **argv)
     if (say_text)
         return run_say(&cfg, say_text);
 
-    /* Logged before anything can fail, so a permissions error still tells the
-     * user which key they were meant to be holding. */
-    char hotkey[128];
-    config_hotkey_desc(&cfg, hotkey, sizeof(hotkey));
-    log_info("hotkey: %s\n", hotkey);
-
+    /* SIGHUP re-reads the config. Every subsystem captures its settings at
+     * init time -- the hotkey lives in the evdev loop, the endpoint in the
+     * curl handle, the source in the capture stream -- so applying a change
+     * means tearing the stack down and standing it back up. That is what this
+     * loop does: same process, same uinput device, fresh config. */
     int rc = 1;
-    pthread_t worker_thread;
-    bool worker_started = false;
+    bool reloading;
 
-    jobs = queue_create(QUEUE_CAP);
-    if (!jobs)
-        goto out;
+    do {
+        pthread_t worker_thread;
+        bool worker_started = false;
 
-    if (transcribe_init(&cfg) < 0)
-        goto out;
+        reload_requested = 0;
+        reloading = false;
 
-    /* The injector claims /dev/uinput before input_init enumerates devices, so
-     * our own virtual keyboard already exists and gets skipped there. */
-    if (!print_only) {
-        inj = injector_init(&cfg);
-        if (!inj)
+        /* Logged before anything can fail, so a permissions error still tells
+         * the user which key they were meant to be holding. */
+        char hotkey[128];
+        config_hotkey_desc(&cfg, hotkey, sizeof(hotkey));
+        log_info("hotkey: %s\n", hotkey);
+
+        jobs = queue_create(QUEUE_CAP);
+        if (!jobs)
             goto out;
-    }
 
-    if (input_init(&cfg, on_hold, NULL) < 0)
-        goto out;
+        if (transcribe_init(&cfg) < 0)
+            goto out;
 
-    if (audio_init(&cfg, jobs) < 0)
-        goto out;
+        /* A history directory we cannot create is worth reporting, but not
+         * worth refusing to transcribe over. */
+        history_init(&cfg);
 
-    if (pthread_create(&worker_thread, NULL, worker, NULL) != 0) {
-        log_err("cannot start worker thread\n");
-        goto out;
-    }
-    worker_started = true;
+        /* The injector claims /dev/uinput before input_init enumerates
+         * devices, so our own virtual keyboard already exists and gets
+         * skipped there. */
+        if (!print_only) {
+            inj = injector_init(&cfg);
+            if (!inj)
+                goto out;
+        }
 
-    struct sigaction sa = { .sa_handler = on_signal };
-    sigemptyset(&sa.sa_mask);
-    sigaction(SIGINT, &sa, NULL);
-    sigaction(SIGTERM, &sa, NULL);
+        if (input_init(&cfg, on_hold, NULL) < 0)
+            goto out;
 
-    log_info("ready; hold %s to talk\n", hotkey);
-    rc = input_run() < 0 ? 1 : 0;
-    log_info("shutting down\n");
+        if (audio_init(&cfg, jobs) < 0)
+            goto out;
 
-out:
-    audio_shutdown();
-    if (jobs)
-        queue_close(jobs);
-    if (worker_started)
-        pthread_join(worker_thread, NULL);
-    input_shutdown();
-    injector_destroy(inj);
-    transcribe_shutdown();
-    queue_destroy(jobs);
+        if (pthread_create(&worker_thread, NULL, worker, NULL) != 0) {
+            log_err("cannot start worker thread\n");
+            goto out;
+        }
+        worker_started = true;
+
+        struct sigaction sa = { .sa_handler = on_signal };
+        sigemptyset(&sa.sa_mask);
+        sigaction(SIGINT, &sa, NULL);
+        sigaction(SIGTERM, &sa, NULL);
+        sigaction(SIGHUP, &sa, NULL);
+
+        log_info("ready; hold %s to talk\n", hotkey);
+        rc = input_run() < 0 ? 1 : 0;
+
+        /* input_run returns for either reason; the flag says which. */
+        reloading = reload_requested != 0;
+        log_info("%s\n", reloading ? "SIGHUP: reloading configuration"
+                                   : "shutting down");
+
+    out:
+        audio_shutdown();
+        if (jobs)
+            queue_close(jobs);
+        if (worker_started)
+            pthread_join(worker_thread, NULL);
+        input_shutdown();
+        injector_destroy(inj);
+        history_shutdown();
+        transcribe_shutdown();
+        queue_destroy(jobs);
+        jobs = NULL;
+        inj = NULL;
+
+        /* A bad config on reload would otherwise silently swap the running
+         * settings for defaults, so say so rather than carrying on quietly. */
+        if (reloading && config_load(&cfg, cfg_path) < 0)
+            log_warn("reloaded config has errors; some settings fell back to "
+                     "defaults\n");
+    } while (reloading);
+
     return rc;
 }

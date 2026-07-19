@@ -151,6 +151,9 @@ int config_load(config *cfg, const char *path)
     snprintf(cfg->model, sizeof(cfg->model), "whisper-1");
     snprintf(cfg->backend, sizeof(cfg->backend), "auto");
     snprintf(cfg->layout, sizeof(cfg->layout), "us");
+    /* Off by default: a verbatim record of everything spoken at the machine
+     * is something the user opts into, not something they discover later. */
+    cfg->history = false;
     cfg->paste_key = KEY_V;
     cfg->paste_mods[0] = KEY_LEFTCTRL;
     cfg->n_paste_mods = 1;
@@ -199,6 +202,11 @@ int config_load(config *cfg, const char *path)
             snprintf(cfg->api_key, sizeof(cfg->api_key), "%s", val);
         } else if (strcmp(key, "source") == 0) {
             snprintf(cfg->source, sizeof(cfg->source), "%s", val);
+        } else if (strcmp(key, "history") == 0) {
+            cfg->history = strcmp(val, "on") == 0 || strcmp(val, "true") == 0 ||
+                           strcmp(val, "yes") == 0 || strcmp(val, "1") == 0;
+        } else if (strcmp(key, "history_dir") == 0) {
+            snprintf(cfg->history_dir, sizeof(cfg->history_dir), "%s", val);
         } else if (strcmp(key, "variant") == 0) {
             snprintf(cfg->variant, sizeof(cfg->variant), "%s", val);
         } else if (strcmp(key, "backend") == 0) {
