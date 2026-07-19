@@ -255,6 +255,9 @@ function buildLeft() {
     const srcIdx = Math.max(0, srcList.findIndex(s => s.name === cfg.source));
     const micSel = select(srcList.map(s => s.description), srcIdx, i => {
         cfg.source = srcList[i].name;
+        /* The meter must follow the selection, or it reports a device the
+         * daemon is no longer going to use. */
+        if (levelMeter) levelMeter.setSource(cfg.source);
         persist();
     });
 
@@ -441,7 +444,7 @@ function startRuntime() {
         meterValues = vals;
         meter.queue_draw();
     });
-    levelMeter.start();
+    levelMeter.start(cfg.source);
 
     /* 1.1s step blink, per the spec. */
     GLib.timeout_add(GLib.PRIORITY_DEFAULT, 550, () => {

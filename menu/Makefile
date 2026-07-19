@@ -29,8 +29,9 @@ deps:
 	@command -v pactl >/dev/null \
 	    && echo "ok   pactl (capture device names)" \
 	    || echo "MISSING pactl -> device selection falls back to labels only"
-	@test -e /usr/lib64/girepository-1.0/AstalCava-0.1.typelib \
-	    && echo "ok   AstalCava (level meter)" || echo "MISSING astal-libs"
+	@command -v parec >/dev/null \
+	    && echo "ok   parec (level meter)" \
+	    || echo "MISSING parec -> the level meter stays flat"
 	@test -e /usr/lib64/girepository-1.0/Gtk4LayerShell-1.0.typelib \
 	    && echo "ok   Gtk4LayerShell" || echo "MISSING gtk4-layer-shell"
 	@fc-list | grep -qi "plex mono" \

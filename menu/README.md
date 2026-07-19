@@ -18,8 +18,8 @@ Everything except the font is already installed on this machine:
 | | |
 |---|---|
 | `gjs` | GTK4 JavaScript runtime |
-| `astal-gtk4`, `astal-libs` | `AstalCava` (level meter) |
-| `pactl` | capture device names |
+| `astal-gtk4` | GTK4 widget layer |
+| `pactl`, `parec` | capture device names, level meter |
 | `gtk4-layer-shell` | only for `--layer` mode |
 | **IBM Plex Mono** | **not installed** — `sudo dnf install ibm-plex-mono-fonts` |
 
@@ -70,6 +70,9 @@ bindsym $mod+w exec /usr/local/bin/whisprd-menu
 Hyprland already floats it without a rule, since it is fixed-size — the rules
 above just make the placement explicit.
 
+The `application_id` gives it single-instance behaviour: pressing the keybind
+while the panel is already open focuses it rather than starting a second copy.
+
 ### Overlay mode
 
 `whisprd-menu --layer` (or `WHISPRD_MENU_LAYER=1`) makes it a layer-shell
@@ -91,25 +94,30 @@ process that logs to stderr. Everything here binds to what actually exists:
 | status dot | `systemctl --user is-active whisprd` | yes |
 | live transcript feed | `journalctl --user -u whisprd -f`, matching the `transcript:` prefix written by `src/main.c` | yes |
 | microphone list | `pactl list sources` | yes |
-| level meter | `AstalCava`, 48 bars, throttled to 30fps | **no — see below** |
+| level meter | `parec` on the selected device, 48 bars at ~31fps | yes |
 | all five settings panels | `~/.config/whisprd/config.ini` | yes |
 | config reload | `SIGHUP` to the daemon | yes |
 | recent sessions, file count, open, delete | `~/.local/share/whisprd/transcriptions` | yes |
 
-### Known issue: the level meter does not move
+### The level meter
 
-It does not follow the selected microphone. AstalCava defaults to source
-`auto` — the default *output* monitor — so with nothing playing it reads zero.
+`parec` on the selected device at 16 kHz mono — the same rate the daemon
+captures at — RMS per ~32 ms chunk, so it updates at about 31 fps and reflects
+what whisprd actually hears. Bars scroll right-to-left, so the meter reads as
+recent history rather than one number smeared across 48 columns.
 
-Pointing it at the capture device is the obvious fix, but assigning
-`cava.source` on the packaged snapshot (`astal 0~9.git7f2292f`) aborts the
-process with `free(): double free detected in tcache 2`. The assignment is
-deliberately not made: a meter is not worth crashing the panel for.
+The silence threshold is learned rather than fixed. Noise floors vary far more
+between devices than a constant can absorb: measured on this machine, a
+desktop analog input idles at RMS 729 while a USB camera mic idles at 162. A
+fixed threshold would show a quarter-full bar in a silent room on one and
+swallow quiet speech on the other. So the quietest chunk in the last ~3 s is
+taken as silence for whichever device is open, which puts both near zero at
+rest. Speech is not continuous, so its gaps keep that minimum honest.
 
-The fix is to drop Cava here and read the device directly —
-`parec --device=<source> --format=s16le --rate=16000 --channels=1` into an RMS
-calculation gives a true level for the selected microphone and removes the
-dependency entirely. Not yet done.
+Astal is deliberately not in this path. `AstalCava` can only be aimed at a
+source by assigning `cava.source`, which aborts the process with
+`free(): double free detected in tcache 2` on the packaged snapshot
+(`astal 0~9.git7f2292f`).
 
 ## History
 
