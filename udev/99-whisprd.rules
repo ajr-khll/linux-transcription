@@ -1,0 +1,5 @@
+# whisprd needs to read keyboards and create a virtual one, without root.
+# Install to /etc/udev/rules.d/, then: sudo udevadm control --reload && sudo udevadm trigger
+# You must also be in the 'input' group: sudo usermod -aG input $USER  (re-login after)
+KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"
+SUBSYSTEM=="input", KERNEL=="event*", GROUP="input", MODE="0640"

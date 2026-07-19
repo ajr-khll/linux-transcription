@@ -1,0 +1,19 @@
+# --- hotkey ---
+# evdev key name to hold. Single key or "MOD+KEY".
+hotkey = KEY_RIGHTCTRL
+
+# --- inference endpoint (cloud vs local is JUST this URL) ---
+# local  (offline): http://127.0.0.1:8080/v1
+# cloud  (OpenAI):  https://api.openai.com/v1
+endpoint_url = http://127.0.0.1:8080/v1
+model        = whisper-1
+# api_key only needed for cloud; omit/empty for local server
+api_key      =
+
+# --- injection ---
+# backend = auto | wlr-vk | clipboard
+backend = auto
+# XKB layout name, reserved for the declared-layout uinput backend
+layout  = us
+# paste chord for the clipboard backend
+paste_chord = ctrl+v          # terminals often need: ctrl+shift+v
