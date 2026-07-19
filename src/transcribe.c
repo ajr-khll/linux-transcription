@@ -145,7 +145,7 @@ char *transcribe_pcm(const int16_t *samples, size_t n_samples)
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &resp);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 120L);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "whisprd/0.1");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "whisprd/" WHISPRD_VERSION);
 
     char *text = NULL;
     CURLcode rc = curl_easy_perform(curl);

@@ -26,4 +26,9 @@ void audio_set_capturing(bool on);
 
 void audio_shutdown(void);
 
+/* Prints every capture source with a short live level measurement, so a user
+ * can pick their microphone by watching which one actually responds rather
+ * than guessing from device names. Returns 0 on success. */
+int audio_list_sources(void);
+
 #endif

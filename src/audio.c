@@ -16,6 +16,7 @@
 #include <string.h>
 
 #include <pulse/error.h>
+#include <pulse/pulseaudio.h>
 #include <pulse/simple.h>
 
 #define CHUNK_SAMPLES  320                      /* 20 ms */
@@ -209,6 +210,128 @@ int audio_init(const config *cfg, queue *out)
 void audio_set_capturing(bool on)
 {
     atomic_store(&capturing, on);
+}
+
+/* ---- source enumeration ------------------------------------------------ */
+
+typedef struct {
+    char name[256];
+    char desc[256];
+    bool monitor;
+} src_entry;
+
+typedef struct {
+    src_entry *v;
+    size_t     n, cap;
+} src_list;
+
+static void on_source(pa_context *c, const pa_source_info *i, int eol, void *user)
+{
+    (void)c;
+    src_list *l = user;
+    if (eol || !i)
+        return;
+    if (l->n == l->cap) {
+        size_t cap = l->cap ? l->cap * 2 : 16;
+        src_entry *p = realloc(l->v, cap * sizeof(*p));
+        if (!p)
+            return;
+        l->v = p;
+        l->cap = cap;
+    }
+    src_entry *e = &l->v[l->n++];
+    snprintf(e->name, sizeof(e->name), "%s", i->name ? i->name : "");
+    snprintf(e->desc, sizeof(e->desc), "%s", i->description ? i->description : "");
+    e->monitor = i->monitor_of_sink != PA_INVALID_INDEX;
+}
+
+/* Records briefly from one source and returns its peak, 0..32767, or -1. */
+static int measure_peak(const char *source, int ms)
+{
+    const pa_sample_spec ss = {
+        .format = PA_SAMPLE_S16LE, .rate = AUDIO_RATE, .channels = 1,
+    };
+    int err;
+    pa_simple *s = pa_simple_new(NULL, "whisprd", PA_STREAM_RECORD, source,
+                                 "level check", &ss, NULL, NULL, &err);
+    if (!s)
+        return -1;
+
+    size_t total = (size_t)AUDIO_RATE * (size_t)ms / 1000;
+    int16_t chunk[CHUNK_SAMPLES];
+    int peak = 0;
+    for (size_t done = 0; done < total; done += CHUNK_SAMPLES) {
+        if (pa_simple_read(s, chunk, sizeof(chunk), &err) < 0)
+            break;
+        for (size_t i = 0; i < CHUNK_SAMPLES; i++) {
+            int v = chunk[i] < 0 ? -chunk[i] : chunk[i];
+            if (v > peak)
+                peak = v;
+        }
+    }
+    pa_simple_free(s);
+    return peak;
+}
+
+int audio_list_sources(void)
+{
+    pa_mainloop *ml = pa_mainloop_new();
+    if (!ml)
+        return -1;
+    pa_context *ctx = pa_context_new(pa_mainloop_get_api(ml), "whisprd");
+    if (!ctx || pa_context_connect(ctx, NULL, PA_CONTEXT_NOFLAGS, NULL) < 0) {
+        log_err("cannot connect to the audio server\n");
+        pa_mainloop_free(ml);
+        return -1;
+    }
+
+    for (;;) {
+        pa_context_state_t st = pa_context_get_state(ctx);
+        if (st == PA_CONTEXT_READY)
+            break;
+        if (!PA_CONTEXT_IS_GOOD(st)) {
+            log_err("audio server connection failed\n");
+            pa_context_unref(ctx);
+            pa_mainloop_free(ml);
+            return -1;
+        }
+        pa_mainloop_iterate(ml, 1, NULL);
+    }
+
+    src_list list = { 0 };
+    pa_operation *op = pa_context_get_source_info_list(ctx, on_source, &list);
+    while (op && pa_operation_get_state(op) == PA_OPERATION_RUNNING)
+        pa_mainloop_iterate(ml, 1, NULL);
+    if (op)
+        pa_operation_unref(op);
+
+    pa_context_disconnect(ctx);
+    pa_context_unref(ctx);
+    pa_mainloop_free(ml);
+
+    printf("Sampling each source for 400 ms -- speak now to see your mic respond.\n\n");
+    printf("%-6s %-9s %s\n", "PEAK", "KIND", "SOURCE");
+
+    for (size_t i = 0; i < list.n; i++) {
+        int peak = measure_peak(list.v[i].name, 400);
+        char lvl[16];
+        if (peak < 0)
+            snprintf(lvl, sizeof(lvl), "  n/a");
+        else
+            snprintf(lvl, sizeof(lvl), "%4.1f%%", peak / 327.68);
+
+        printf("%-6s %-9s %s\n", lvl, list.v[i].monitor ? "monitor" : "input",
+               list.v[i].name);
+        printf("       %-9s %s\n", "", list.v[i].desc);
+    }
+
+    printf("\nPut the name of the source you want in config as:  source = <name>\n");
+    printf("A live microphone reads well above %.1f%%; anything at or below that is\n",
+           SILENCE_PEAK / 327.68);
+    printf("silence, and whisprd will refuse to transcribe from it.\n");
+
+    free(list.v);
+    return 0;
 }
 
 void audio_shutdown(void)

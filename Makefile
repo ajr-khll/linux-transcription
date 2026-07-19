@@ -1,3 +1,4 @@
+VERSION     := 0.1.0
 PREFIX      ?= /usr/local
 BUILD       ?= build
 
@@ -11,7 +12,7 @@ CFLAGS      += -std=c11 -Wall -Wextra -Wno-unused-parameter -D_GNU_SOURCE -I$(BU
 # Header dependency tracking. Without this, editing a header rebuilds nothing
 # that includes it, and a struct layout change silently yields object files
 # compiled against different definitions of the same struct.
-CFLAGS      += -MMD -MP
+CFLAGS      += -MMD -MP -DWHISPRD_VERSION='"$(VERSION)"'
 LDLIBS      += -lpthread
 
 SRC := src/main.c src/config.c src/input.c src/audio.c src/transcribe.c \
