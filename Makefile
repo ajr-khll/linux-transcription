@@ -17,11 +17,11 @@ CFLAGS      += -std=c11 -Wall -Wextra -Wno-unused-parameter -D_GNU_SOURCE -I$(BU
 # that includes it, and a struct layout change silently yields object files
 # compiled against different definitions of the same struct.
 CFLAGS      += -MMD -MP -DWHISPRD_VERSION='"$(VERSION)"'
-LDLIBS      += -lpthread
+LDLIBS      += -lpthread -lm
 
 SRC := src/main.c src/config.c src/input.c src/audio.c src/transcribe.c \
        src/json_text.c src/queue.c src/uinput_kbd.c src/injector.c \
-       src/history.c src/backends/clipboard.c
+       src/history.c src/cue.c src/backends/clipboard.c
 
 PROTO_XML   := protocol/virtual-keyboard-unstable-v1.xml
 PROTO_H     := $(BUILD)/virtual-keyboard-unstable-v1-client-protocol.h

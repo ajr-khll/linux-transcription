@@ -175,6 +175,9 @@ int config_load(config *cfg, const char *path)
     /* Off by default: a verbatim record of everything spoken at the machine
      * is something the user opts into, not something they discover later. */
     cfg->history = false;
+    /* On by default: with no cue the user gets no sign the hotkey registered
+     * until the text appears, and none at all when it does not. */
+    cfg->audio_cues = true;
     cfg->paste_key = KEY_V;
     cfg->paste_mods[0] = KEY_LEFTCTRL;
     cfg->n_paste_mods = 1;
@@ -229,6 +232,9 @@ int config_load(config *cfg, const char *path)
                            strcmp(val, "yes") == 0 || strcmp(val, "1") == 0;
         } else if (strcmp(key, "history_dir") == 0) {
             snprintf(cfg->history_dir, sizeof(cfg->history_dir), "%s", val);
+        } else if (strcmp(key, "audio_cues") == 0) {
+            cfg->audio_cues = strcmp(val, "on") == 0 || strcmp(val, "true") == 0 ||
+                              strcmp(val, "yes") == 0 || strcmp(val, "1") == 0;
         } else if (strcmp(key, "variant") == 0) {
             snprintf(cfg->variant, sizeof(cfg->variant), "%s", val);
         } else if (strcmp(key, "backend") == 0) {

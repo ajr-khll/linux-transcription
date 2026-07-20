@@ -9,6 +9,7 @@
  */
 #include "audio.h"
 #include "config.h"
+#include "cue.h"
 #include "history.h"
 #include "injector.h"
 #include "input.h"
@@ -35,6 +36,7 @@ static void on_hold(bool holding, void *user)
     (void)user;
     log_dbg("%s\n", holding ? "HOLD_START" : "HOLD_STOP");
     audio_set_capturing(holding);
+    cue_play(holding ? CUE_START : CUE_STOP);
 }
 
 static void *worker(void *arg)
@@ -47,8 +49,10 @@ static void *worker(void *arg)
 
         char *text = transcribe_pcm(b->samples, b->n_samples);
         pcm_buffer_free(b);
-        if (!text)
+        if (!text) {
+            cue_play(CUE_ERROR);            /* network or endpoint failure */
             continue;
+        }
 
         /* Leading space is common from Whisper and reads as a typo. */
         char *start = text;
@@ -60,8 +64,12 @@ static void *worker(void *arg)
             /* Recorded before injection so a failing backend still leaves the
              * transcript somewhere the user can get at it. */
             history_append(start);
-            if (!print_only && injector_send(inj, start) < 0)
+            if (!print_only && injector_send(inj, start) < 0) {
                 log_err("injection failed\n");
+                cue_play(CUE_ERROR);
+            }
+        } else {
+            cue_play(CUE_ERROR);            /* nothing was recognised */
         }
         free(text);
     }
@@ -182,6 +190,8 @@ int main(int argc, char **argv)
         /* A history directory we cannot create is worth reporting, but not
          * worth refusing to transcribe over. */
         history_init(&cfg);
+
+        cue_init(&cfg);
 
         /* The injector claims /dev/uinput before input_init enumerates
          * devices, so our own virtual keyboard already exists and gets

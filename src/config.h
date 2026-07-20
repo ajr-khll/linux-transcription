@@ -29,6 +29,8 @@ typedef struct {
     bool history;                       /* keep transcripts on disk */
     char history_dir[512];              /* empty = XDG data dir */
 
+    bool audio_cues;                    /* play start/stop/error tones */
+
     char backend[32];                   /* auto | wlr-vk | clipboard | x11 | uinput */
     char layout[64];                    /* xkb layout, for uinput-layout backend */
     char variant[64];                   /* optional xkb variant, e.g. "intl" */

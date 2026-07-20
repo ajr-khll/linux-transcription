@@ -114,6 +114,11 @@ still a copy of your key on someone else's disk.
 `model` picks the transcription model: `whisper-1`, `gpt-4o-transcribe`, or
 `gpt-4o-mini-transcribe`.
 
+`audio_cues = on` (the default) plays a short tone so you can dictate without
+watching the screen: a rising pair when the hotkey goes down, a falling pair
+when it comes up, a low double beep when nothing usable came back. It uses
+`paplay`, already pulled in with `pulseaudio-utils`.
+
 ## Settings panel
 
 `whisprd-menu` is the settings and transcript-history panel — a GJS + GTK4 app under
