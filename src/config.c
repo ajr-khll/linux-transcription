@@ -75,14 +75,20 @@ int config_parse_key_name(const char *name)
     return -1;
 }
 
-/* Parses "MOD+MOD+KEY" into a trailing key plus its required modifiers. */
+/* Parses "MOD+MOD+KEY" into a trailing key plus its required modifiers.
+ *
+ * Parses into locals and only writes to the caller on success. A partially
+ * parsed chord left in the config is worse than no change at all: on SIGHUP the
+ * daemon carries on running (see main.c), so a key code of -1 would mean a
+ * hotkey no keypress can ever match, with nothing in the log to say so. */
 static int parse_chord(const char *spec, int *key_out, int *mods, size_t *n_mods)
 {
     char buf[128];
     snprintf(buf, sizeof(buf), "%s", spec);
 
-    *n_mods = 0;
-    *key_out = -1;
+    int    key = -1;
+    int    tmp_mods[CFG_MAX_MODS];
+    size_t n = 0;
 
     char *save = NULL;
     for (char *tok = strtok_r(buf, "+", &save); tok; tok = strtok_r(NULL, "+", &save)) {
@@ -95,19 +101,23 @@ static int parse_chord(const char *spec, int *key_out, int *mods, size_t *n_mods
             return -1;
         }
         /* The last token is the key; everything before it is a modifier. */
-        if (*key_out >= 0) {
-            if (*n_mods >= CFG_MAX_MODS) {
+        if (key >= 0) {
+            if (n >= CFG_MAX_MODS) {
                 log_err("too many modifiers in chord '%s'\n", spec);
                 return -1;
             }
-            mods[(*n_mods)++] = *key_out;
+            tmp_mods[n++] = key;
         }
-        *key_out = code;
+        key = code;
     }
-    if (*key_out < 0) {
+    if (key < 0) {
         log_err("empty chord '%s'\n", spec);
         return -1;
     }
+
+    *key_out = key;
+    *n_mods = n;
+    memcpy(mods, tmp_mods, n * sizeof(*mods));
     return 0;
 }
 
@@ -143,14 +153,28 @@ static void default_path(char *out, size_t n)
         snprintf(out, n, "%s/.config/whisprd/config.ini", getenv("HOME") ? getenv("HOME") : ".");
 }
 
+/* The environment wins over the file. Keeping the key out of config.ini is the
+ * point: dotfiles get synced, backed up and occasionally committed, and a
+ * leaked OpenAI key costs real money. OPENAI_API_KEY is the name every other
+ * tool already uses, so an existing export needs no extra setup here. */
+static void apply_env_overrides(config *cfg)
+{
+    const char *key = getenv("OPENAI_API_KEY");
+    if (key && *key)
+        snprintf(cfg->api_key, sizeof(cfg->api_key), "%s", key);
+}
+
 int config_load(config *cfg, const char *path)
 {
     memset(cfg, 0, sizeof(*cfg));
     cfg->hotkey_code = KEY_RIGHTCTRL;
-    snprintf(cfg->endpoint_url, sizeof(cfg->endpoint_url), "http://127.0.0.1:8080/v1");
+    snprintf(cfg->endpoint_url, sizeof(cfg->endpoint_url), "https://api.openai.com/v1");
     snprintf(cfg->model, sizeof(cfg->model), "whisper-1");
     snprintf(cfg->backend, sizeof(cfg->backend), "auto");
     snprintf(cfg->layout, sizeof(cfg->layout), "us");
+    /* Off by default: a verbatim record of everything spoken at the machine
+     * is something the user opts into, not something they discover later. */
+    cfg->history = false;
     cfg->paste_key = KEY_V;
     cfg->paste_mods[0] = KEY_LEFTCTRL;
     cfg->n_paste_mods = 1;
@@ -164,6 +188,7 @@ int config_load(config *cfg, const char *path)
     FILE *f = fopen(path, "r");
     if (!f) {
         log_info("no config at %s, using defaults\n", path);
+        apply_env_overrides(cfg);
         return 0;
     }
 
@@ -199,6 +224,11 @@ int config_load(config *cfg, const char *path)
             snprintf(cfg->api_key, sizeof(cfg->api_key), "%s", val);
         } else if (strcmp(key, "source") == 0) {
             snprintf(cfg->source, sizeof(cfg->source), "%s", val);
+        } else if (strcmp(key, "history") == 0) {
+            cfg->history = strcmp(val, "on") == 0 || strcmp(val, "true") == 0 ||
+                           strcmp(val, "yes") == 0 || strcmp(val, "1") == 0;
+        } else if (strcmp(key, "history_dir") == 0) {
+            snprintf(cfg->history_dir, sizeof(cfg->history_dir), "%s", val);
         } else if (strcmp(key, "variant") == 0) {
             snprintf(cfg->variant, sizeof(cfg->variant), "%s", val);
         } else if (strcmp(key, "backend") == 0) {
@@ -216,5 +246,6 @@ int config_load(config *cfg, const char *path)
     while (ulen > 0 && cfg->endpoint_url[ulen - 1] == '/')
         cfg->endpoint_url[--ulen] = '\0';
 
+    apply_env_overrides(cfg);
     return rc;
 }

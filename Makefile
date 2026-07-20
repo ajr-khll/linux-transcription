@@ -5,7 +5,10 @@ BUILD       ?= build
 # Backends are opt-out so users only pull in what their session needs.
 WITH_WLR_VK ?= 1
 WITH_UINPUT_LAYOUT ?= 1
-WITH_GUI    ?= 1
+# The settings UI is whisprd-menu (menu/), a separate GJS application. It does
+# not compile and does not link against the daemon -- they share only
+# config.ini, SIGHUP and the journal -- so it installs rather than builds.
+WITH_MENU   ?= 1
 
 PKGS        := libevdev libpulse-simple libcurl
 CFLAGS      ?= -O2 -g
@@ -14,12 +17,11 @@ CFLAGS      += -std=c11 -Wall -Wextra -Wno-unused-parameter -D_GNU_SOURCE -I$(BU
 # that includes it, and a struct layout change silently yields object files
 # compiled against different definitions of the same struct.
 CFLAGS      += -MMD -MP -DWHISPRD_VERSION='"$(VERSION)"'
-CFLAGS      += -DDATADIR='"$(PREFIX)/share"'
 LDLIBS      += -lpthread
 
 SRC := src/main.c src/config.c src/input.c src/audio.c src/transcribe.c \
        src/json_text.c src/queue.c src/uinput_kbd.c src/injector.c \
-       src/backends/clipboard.c
+       src/history.c src/backends/clipboard.c
 
 PROTO_XML   := protocol/virtual-keyboard-unstable-v1.xml
 PROTO_H     := $(BUILD)/virtual-keyboard-unstable-v1-client-protocol.h
@@ -44,22 +46,9 @@ LDLIBS += $(shell pkg-config --libs $(PKGS))
 
 OBJ := $(patsubst %.c,$(BUILD)/%.o,$(SRC)) $(patsubst $(BUILD)/%.c,$(BUILD)/%.o,$(GEN))
 
-GUI_SRC := src/gui/main.c src/config.c src/audio.c src/queue.c
-GUI_CFLAGS := $(CFLAGS) $(shell pkg-config --cflags gtk4)
-GUI_LIBS   := $(shell pkg-config --libs gtk4) $(LDLIBS) $(shell pkg-config --libs libpulse-simple libevdev) -lm
-
-ifeq ($(WITH_GUI),1)
-  TARGETS += $(BUILD)/whisprd-gui
-endif
-
 .PHONY: all clean install uninstall test
 
-all: $(BUILD)/whisprd $(TARGETS)
-
-# Built as its own binary on purpose: the daemon must not depend on GTK.
-$(BUILD)/whisprd-gui: $(GUI_SRC)
-	@mkdir -p $(dir $@)
-	$(CC) $(GUI_CFLAGS) $(GUI_SRC) $(GUI_LIBS) -o $@
+all: $(BUILD)/whisprd
 
 # These two cover the parts most likely to be subtly wrong, and need neither a
 # compositor nor a network: JSON unescaping, and whether the keymap we generate
@@ -107,15 +96,15 @@ install: all
 	# ship a broken unit for any non-default PREFIX.
 	sed 's|@BINDIR@|$(PREFIX)/bin|' systemd/whisprd.service.in > $(BUILD)/whisprd.service
 	install -Dm644 $(BUILD)/whisprd.service $(DESTDIR)$(PREFIX)/lib/systemd/user/whisprd.service
-ifeq ($(WITH_GUI),1)
-	install -Dm755 $(BUILD)/whisprd-gui $(DESTDIR)$(PREFIX)/bin/whisprd-gui
-	install -Dm644 src/gui/style.css $(DESTDIR)$(PREFIX)/share/whisprd/style.css
-	install -Dm644 desktop/dev.whisprd.Settings.desktop \
-	    $(DESTDIR)$(PREFIX)/share/applications/dev.whisprd.Settings.desktop
+ifeq ($(WITH_MENU),1)
+	$(MAKE) -C menu install PREFIX=$(PREFIX) DESTDIR=$(DESTDIR)
+	install -Dm644 desktop/dev.whisprd.Menu.desktop \
+	    $(DESTDIR)$(PREFIX)/share/applications/dev.whisprd.Menu.desktop
 endif
 
 uninstall:
-	rm -f $(DESTDIR)$(PREFIX)/bin/whisprd $(DESTDIR)$(PREFIX)/bin/whisprd-gui
-	rm -f $(DESTDIR)$(PREFIX)/share/applications/dev.whisprd.Settings.desktop
+	rm -f $(DESTDIR)$(PREFIX)/bin/whisprd
+	rm -f $(DESTDIR)$(PREFIX)/share/applications/dev.whisprd.Menu.desktop
 	rm -f $(DESTDIR)$(PREFIX)/lib/systemd/user/whisprd.service
 	rm -rf $(DESTDIR)$(PREFIX)/share/whisprd
+	$(MAKE) -C menu uninstall PREFIX=$(PREFIX) DESTDIR=$(DESTDIR)

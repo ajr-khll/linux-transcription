@@ -276,6 +276,8 @@ audio_source *audio_enumerate_sources(size_t *n_out)
     pa_context *ctx = pa_context_new(pa_mainloop_get_api(ml), "whisprd");
     if (!ctx || pa_context_connect(ctx, NULL, PA_CONTEXT_NOFLAGS, NULL) < 0) {
         log_err("cannot connect to the audio server\n");
+        if (ctx)
+            pa_context_unref(ctx);
         pa_mainloop_free(ml);
         return NULL;
     }
@@ -350,4 +352,13 @@ void audio_shutdown(void)
     free(utt);
     utt = NULL;
     utt_cap = utt_n = 0;
+
+    /* SIGHUP tears this down and stands it back up in the same process, so
+     * every static here outlives the stream it belongs to. Left set, the
+     * preroll would seed the first utterance after a reload with up to 250 ms
+     * of audio from the *previous* microphone, and a hotkey still held across
+     * the reload would start the new stream mid-utterance. */
+    preroll_pos = 0;
+    preroll_full = false;
+    atomic_store(&capturing, false);
 }

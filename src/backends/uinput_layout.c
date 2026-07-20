@@ -159,8 +159,14 @@ static int build_map(layout_ctx *c, struct xkb_keymap *km)
             if (c->n_map == cap) {
                 cap *= 2;
                 keystroke *p = realloc(c->map, cap * sizeof(*p));
-                if (!p)
+                if (!p) {
+                    /* The caller frees `c` but knows nothing about this
+                     * allocation, so release it here. */
+                    free(c->map);
+                    c->map = NULL;
+                    c->n_map = 0;
                     return -1;
+                }
                 c->map = p;
             }
             keystroke *k = &c->map[c->n_map++];

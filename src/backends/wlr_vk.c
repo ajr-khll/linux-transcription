@@ -141,38 +141,58 @@ static xkb_keysym_t keysym_for(uint32_t cp)
     return ks;
 }
 
-/* Builds an xkb keymap placing distinct[i] alone on keycode 9+i. */
+/* Builds an xkb keymap placing distinct[i] alone on keycode 9+i.
+ *
+ * snprintf returns what it *would* have written, so accumulating it blindly
+ * lets `len` run past `cap` -- and `cap - len` is unsigned, so the next call
+ * would be handed a length near SIZE_MAX and write off the end of the heap.
+ * The budget below is comfortable (measured worst case is ~66 bytes per key
+ * against 64 plus 4 KB of slack), so this never trips today; the check is here
+ * so that a longer keysym name than any that exists now cannot turn a truncated
+ * keymap into a heap overflow. */
 static char *build_keymap(const uint32_t *distinct, size_t n)
 {
-    size_t cap = 4096 + n * 64;
+    size_t cap = 4096 + n * 96;
     char *km = malloc(cap);
     if (!km)
         return NULL;
 
-    int len = snprintf(km, cap,
-        "xkb_keymap {\n"
-        "xkb_keycodes \"(whisprd)\" {\n"
-        "  minimum = 8;\n"
-        "  maximum = 255;\n");
+    size_t len = 0;
+
+/* Appends to km, or bails out if the buffer would not hold it. */
+#define APPEND(...)                                                           \
+    do {                                                                      \
+        int _w = snprintf(km + len, cap - len, __VA_ARGS__);                  \
+        if (_w < 0 || (size_t)_w >= cap - len) {                              \
+            log_err("keymap buffer too small for %zu characters\n", n);       \
+            free(km);                                                         \
+            return NULL;                                                      \
+        }                                                                     \
+        len += (size_t)_w;                                                    \
+    } while (0)
+
+    APPEND("xkb_keymap {\n"
+           "xkb_keycodes \"(whisprd)\" {\n"
+           "  minimum = 8;\n"
+           "  maximum = 255;\n");
 
     for (size_t i = 0; i < n; i++)
-        len += snprintf(km + len, cap - (size_t)len,
-                        "  <K%zu> = %zu;\n", i, i + 9);
+        APPEND("  <K%zu> = %zu;\n", i, i + 9);
 
-    len += snprintf(km + len, cap - (size_t)len,
-        "};\n"
-        "xkb_types \"(whisprd)\" { include \"complete\" };\n"
-        "xkb_compatibility \"(whisprd)\" { include \"complete\" };\n"
-        "xkb_symbols \"(whisprd)\" {\n");
+    APPEND("};\n"
+           "xkb_types \"(whisprd)\" { include \"complete\" };\n"
+           "xkb_compatibility \"(whisprd)\" { include \"complete\" };\n"
+           "xkb_symbols \"(whisprd)\" {\n");
 
     for (size_t i = 0; i < n; i++) {
         char name[64];
         xkb_keysym_get_name(keysym_for(distinct[i]), name, sizeof(name));
-        len += snprintf(km + len, cap - (size_t)len,
-                        "  key <K%zu> { [ %s ] };\n", i, name);
+        APPEND("  key <K%zu> { [ %s ] };\n", i, name);
     }
 
-    snprintf(km + len, cap - (size_t)len, "};\n};\n");
+    APPEND("};\n};\n");
+#undef APPEND
+
     return km;
 }
 

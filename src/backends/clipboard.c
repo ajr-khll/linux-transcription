@@ -62,11 +62,18 @@ static int run_copy(char *const argv[], const char *text)
 
     close(pipefd[0]);
     size_t len = strlen(text), off = 0;
+    bool wrote_all = true;
     while (off < len) {
         ssize_t w = write(pipefd[1], text + off, len - off);
-        if (w <= 0) {
+        if (w < 0) {
             if (errno == EINTR)
                 continue;
+            /* EPIPE means the helper is already gone -- almost always because
+             * exec failed. The exit status below says which, so do not report
+             * it here. */
+            if (errno != EPIPE)
+                log_err("writing to %s: %s\n", argv[0], strerror(errno));
+            wrote_all = false;
             break;
         }
         off += (size_t)w;
@@ -75,9 +82,22 @@ static int run_copy(char *const argv[], const char *text)
 
     int status = 0;
     waitpid(pid, &status, 0);
+
     if (WIFEXITED(status) && WEXITSTATUS(status) == 127) {
         log_err("%s not found; install wl-clipboard (Wayland) or xclip (X11)\n",
                 argv[0]);
+        return -1;
+    }
+    /* Anything else non-zero means the clipboard was not updated. Pasting
+     * anyway would inject whatever the user had copied earlier, which reads as
+     * whisprd transcribing the wrong thing rather than as a failure. */
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        log_err("%s failed (exit %d); clipboard not updated\n", argv[0],
+                WIFEXITED(status) ? WEXITSTATUS(status) : -1);
+        return -1;
+    }
+    if (!wrote_all) {
+        log_err("could not hand the full transcript to %s\n", argv[0]);
         return -1;
     }
     return 0;

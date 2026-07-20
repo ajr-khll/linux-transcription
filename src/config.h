@@ -10,6 +10,7 @@
 #ifndef WHISPRD_CONFIG_H
 #define WHISPRD_CONFIG_H
 
+#include <stdbool.h>
 #include <stddef.h>
 
 #define CFG_MAX_MODS 4
@@ -24,6 +25,9 @@ typedef struct {
     char api_key[256];                  /* empty for a local server */
 
     char source[256];                   /* pulse source name; empty = default */
+
+    bool history;                       /* keep transcripts on disk */
+    char history_dir[512];              /* empty = XDG data dir */
 
     char backend[32];                   /* auto | wlr-vk | clipboard | x11 | uinput */
     char layout[64];                    /* xkb layout, for uinput-layout backend */
