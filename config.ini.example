@@ -39,6 +39,13 @@ history = off
 # empty = ~/.local/share/whisprd/transcriptions (honours XDG_DATA_HOME)
 history_dir =
 
+# --- cues ---
+# on = play a short tone so you can dictate without watching the screen: a
+# rising pair when the hotkey goes down (listening), a falling pair when it
+# comes up (captured), a low double beep when nothing usable came back. Needs
+# paplay from pulseaudio-utils, which whisprd already uses for capture.
+audio_cues = on
+
 # --- injection ---
 # backend = auto | wlr-vk | uinput | clipboard
 backend = auto

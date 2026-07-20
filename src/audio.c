@@ -8,6 +8,7 @@
  * see the LICENSE file or <https://www.gnu.org/licenses/> for details.
  */
 #include "audio.h"
+#include "cue.h"
 #include "log.h"
 
 #include <pthread.h>
@@ -116,6 +117,7 @@ static void utt_seal(void)
                  "not transcribing\n", peak / 327.68);
         log_warn("if you were speaking, whisprd is on the wrong capture source; "
                  "set 'source =' in the config (see: pactl list short sources)\n");
+        cue_play(CUE_ERROR);
         utt_n = 0;
         return;
     }
