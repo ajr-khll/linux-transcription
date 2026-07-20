@@ -15,6 +15,13 @@ export const KEYS = [
     "history", "history_dir",
 ];
 
+/* The daemon accepts four spellings for on (src/config.c), so a file written by
+ * hand with `history = true` is on as far as whisprd is concerned. Comparing
+ * against the string "on" alone reports it as off. */
+export function isOn(value) {
+    return ["on", "true", "yes", "1"].includes(String(value ?? "").trim().toLowerCase());
+}
+
 export function path() {
     const xdg = GLib.getenv("XDG_CONFIG_HOME");
     const base = xdg && xdg.length ? xdg : GLib.build_filenamev([GLib.get_home_dir(), ".config"]);
@@ -40,6 +47,21 @@ export function defaults() {
     };
 }
 
+/* Mirrors strip_comment() in src/config.c: a '#' only starts a comment at the
+ * start of the line or after whitespace, so one inside a value survives.
+ *
+ * Cutting at the first '#' instead -- which this used to do -- reads a shorter
+ * value than the daemon does, and save() then writes that truncation back over
+ * the real one. The next unrelated change in the panel is enough to trigger it,
+ * and for api_key the damage is silent and permanent. */
+function stripComment(line) {
+    for (let i = 0; i < line.length; i++) {
+        if (line[i] !== "#") continue;
+        if (i === 0 || /\s/.test(line[i - 1])) return line.slice(0, i);
+    }
+    return line;
+}
+
 export function load() {
     const cfg = defaults();
     const p = path();
@@ -51,8 +73,7 @@ export function load() {
 
     const text = new TextDecoder().decode(bytes);
     for (let line of text.split("\n")) {
-        const hash = line.indexOf("#");
-        if (hash >= 0) line = line.slice(0, hash);
+        line = stripComment(line);
         const eq = line.indexOf("=");
         if (eq < 0) continue;
         const key = line.slice(0, eq).trim();
@@ -101,11 +122,16 @@ variant = ${cfg.variant}
 paste_chord = ${cfg.paste_chord}
 `;
 
+    /* PRIVATE creates the file owner-only from the outset. Writing at the umask
+     * default and chmodding afterwards leaves a window -- short, but on every
+     * single save -- where an OpenAI API key is world-readable. The chmod stays
+     * for the case the flag cannot honour: a file that already exists keeps the
+     * permissions it already had. */
     const f = Gio.File.new_for_path(p);
     f.replace_contents(new TextEncoder().encode(out), null, false,
-                       Gio.FileCreateFlags.REPLACE_DESTINATION, null);
+                       Gio.FileCreateFlags.REPLACE_DESTINATION |
+                       Gio.FileCreateFlags.PRIVATE, null);
 
-    /* The file holds an API key, so keep it to the owner. */
     GLib.chmod(p, 0o600);
     return p;
 }

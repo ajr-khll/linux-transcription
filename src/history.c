@@ -12,6 +12,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,6 +20,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
+#include <unistd.h>
 
 #define SLUG_MAX 40
 
@@ -132,16 +134,22 @@ void history_append(const char *text)
     if (!cur_path[0] || now - last_write > HISTORY_GAP_S)
         open_session(text);
 
-    FILE *f = fopen(cur_path, "a");
+    /* Created 0600 rather than created-then-chmodded: between an fopen() at the
+     * umask default and a chmod() afterwards there is a window where a verbatim
+     * record of everything spoken at this machine is world-readable. O_APPEND
+     * because the mode argument only applies when the file is new. */
+    int fd = open(cur_path, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0600);
+    FILE *f = fd < 0 ? NULL : fdopen(fd, "a");
     if (!f) {
         /* Deliberately does not log the transcript itself. */
         log_warn("history: cannot write %s: %s\n", cur_path, strerror(errno));
+        if (fd >= 0)
+            close(fd);
         return;
     }
     fprintf(f, "%s\n", text);
     fclose(f);
 
-    chmod(cur_path, 0600);
     last_write = now;
 }
 

@@ -134,6 +134,13 @@ int main(int argc, char **argv)
         }
     }
 
+    /* The clipboard backend writes the transcript into a pipe to wl-copy. If
+     * that helper is missing, the child exits before the write lands and the
+     * pipe raises SIGPIPE, whose default action would kill the daemon outright
+     * -- and racily, so it would not reproduce reliably. Ignore it here and let
+     * write() report EPIPE to the code that can explain it. */
+    signal(SIGPIPE, SIG_IGN);
+
     config cfg;
     if (config_load(&cfg, cfg_path) < 0)
         return 1;
@@ -225,11 +232,20 @@ int main(int argc, char **argv)
         jobs = NULL;
         inj = NULL;
 
-        /* A bad config on reload would otherwise silently swap the running
-         * settings for defaults, so say so rather than carrying on quietly. */
-        if (reloading && config_load(&cfg, cfg_path) < 0)
-            log_warn("reloaded config has errors; some settings fell back to "
-                     "defaults\n");
+        /* Reload into a scratch copy and only adopt it if it parsed. A bad
+         * config would otherwise swap every setting the daemon is running with
+         * for a default -- including a hotkey, which is the one setting whose
+         * loss is invisible: nothing logs, no key works, and the daemon looks
+         * healthy throughout. Keeping the last good config means a typo costs a
+         * warning rather than a dictation session. */
+        if (reloading) {
+            config next;
+            if (config_load(&next, cfg_path) < 0)
+                log_warn("reloaded config has errors; keeping the previous "
+                         "settings\n");
+            else
+                cfg = next;
+        }
     } while (reloading);
 
     return rc;

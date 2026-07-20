@@ -75,14 +75,20 @@ int config_parse_key_name(const char *name)
     return -1;
 }
 
-/* Parses "MOD+MOD+KEY" into a trailing key plus its required modifiers. */
+/* Parses "MOD+MOD+KEY" into a trailing key plus its required modifiers.
+ *
+ * Parses into locals and only writes to the caller on success. A partially
+ * parsed chord left in the config is worse than no change at all: on SIGHUP the
+ * daemon carries on running (see main.c), so a key code of -1 would mean a
+ * hotkey no keypress can ever match, with nothing in the log to say so. */
 static int parse_chord(const char *spec, int *key_out, int *mods, size_t *n_mods)
 {
     char buf[128];
     snprintf(buf, sizeof(buf), "%s", spec);
 
-    *n_mods = 0;
-    *key_out = -1;
+    int    key = -1;
+    int    tmp_mods[CFG_MAX_MODS];
+    size_t n = 0;
 
     char *save = NULL;
     for (char *tok = strtok_r(buf, "+", &save); tok; tok = strtok_r(NULL, "+", &save)) {
@@ -95,19 +101,23 @@ static int parse_chord(const char *spec, int *key_out, int *mods, size_t *n_mods
             return -1;
         }
         /* The last token is the key; everything before it is a modifier. */
-        if (*key_out >= 0) {
-            if (*n_mods >= CFG_MAX_MODS) {
+        if (key >= 0) {
+            if (n >= CFG_MAX_MODS) {
                 log_err("too many modifiers in chord '%s'\n", spec);
                 return -1;
             }
-            mods[(*n_mods)++] = *key_out;
+            tmp_mods[n++] = key;
         }
-        *key_out = code;
+        key = code;
     }
-    if (*key_out < 0) {
+    if (key < 0) {
         log_err("empty chord '%s'\n", spec);
         return -1;
     }
+
+    *key_out = key;
+    *n_mods = n;
+    memcpy(mods, tmp_mods, n * sizeof(*mods));
     return 0;
 }
 

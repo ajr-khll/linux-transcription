@@ -111,6 +111,47 @@ const MODS = [
     [Gdk.ModifierType.SUPER_MASK,   "KEY_LEFTMETA"],
 ];
 
+/* Gdk key names and evdev key names are different namespaces that happen to
+ * agree on letters, digits and a few others -- which is exactly what makes the
+ * disagreements easy to ship. "KEY_" + Gdk's name gives KEY_RETURN, KEY_PERIOD
+ * and KEY_PAGE_UP, none of which evdev has; the daemon rejects the chord, and
+ * the user is left holding a key that does nothing.
+ *
+ * Only the names that differ are listed. Anything not here and not alphanumeric
+ * is refused outright rather than guessed at. */
+const EVDEV_NAMES = {
+    Return: "KEY_ENTER",           KP_Enter: "KEY_KPENTER",
+    period: "KEY_DOT",             KP_Decimal: "KEY_KPDOT",
+    bracketleft: "KEY_LEFTBRACE",  bracketright: "KEY_RIGHTBRACE",
+    Page_Up: "KEY_PAGEUP",         Page_Down: "KEY_PAGEDOWN",
+    Prior: "KEY_PAGEUP",           Next: "KEY_PAGEDOWN",
+    Caps_Lock: "KEY_CAPSLOCK",     Num_Lock: "KEY_NUMLOCK",
+    Scroll_Lock: "KEY_SCROLLLOCK", Print: "KEY_SYSRQ",
+    KP_Add: "KEY_KPPLUS",          KP_Subtract: "KEY_KPMINUS",
+    KP_Multiply: "KEY_KPASTERISK", KP_Divide: "KEY_KPSLASH",
+    Menu: "KEY_COMPOSE",
+};
+
+/* These share a spelling with evdev once uppercased. Listing them explicitly
+ * beats letting an unrecognised name through and finding out from the daemon's
+ * log that the hotkey never armed. */
+const EVDEV_SAME = new Set([
+    "space", "tab", "backspace", "delete", "insert", "home", "end",
+    "escape", "comma", "semicolon", "apostrophe", "grave", "backslash",
+    "slash", "minus", "equal", "up", "down", "left", "right", "pause",
+]);
+
+/* Returns the evdev name for a Gdk keyval name, or null if we cannot be sure.
+ * Null means "do not write this to the config". */
+function evdevName(gdkName) {
+    if (Object.hasOwn(EVDEV_NAMES, gdkName)) return EVDEV_NAMES[gdkName];
+    if (/^[A-Za-z0-9]$/.test(gdkName)) return "KEY_" + gdkName.toUpperCase();
+    if (/^F([1-9]|1[0-9]|2[0-4])$/.test(gdkName)) return "KEY_" + gdkName.toUpperCase();
+    if (/^KP_[0-9]$/.test(gdkName)) return "KEY_KP" + gdkName.slice(3);
+    if (EVDEV_SAME.has(gdkName.toLowerCase())) return "KEY_" + gdkName.toUpperCase();
+    return null;
+}
+
 /* ---- state ---------------------------------------------------------- */
 
 const cfg = Config.load();
@@ -171,12 +212,30 @@ function captureCombo(keyval, state) {
     /* A bare modifier press starts a chord; it is not the chord itself. */
     if (/^(Control|Alt|Shift|Super|Meta)_[LR]$/.test(name)) return;
 
+    const key = evdevName(name);
+    if (!key) {
+        /* Writing a name the daemon cannot parse would leave the user with a
+         * hotkey that never fires and nothing on screen to explain it. Say so
+         * and keep the old binding instead. */
+        rejectCombo(name);
+        return;
+    }
+
     const parts = MODS.filter(([m]) => (state & m) !== 0).map(([, n]) => n);
-    parts.push("KEY_" + name.toUpperCase());
+    parts.push(key);
     cfg.hotkey = parts.join("+");
 
     stopRecording();
     persist();
+}
+
+/* Stays in recording mode so the next press is still captured -- the user
+ * pressed something, it just was not usable, and dropping them back out would
+ * read as the panel having ignored them. */
+function rejectCombo(name) {
+    let c = chipRow.get_first_child();
+    while (c) { const n = c.get_next_sibling(); chipRow.remove(c); c = n; }
+    chipRow.append(label(`${name} CANNOT BE A HOTKEY — TRY ANOTHER`, "awaiting"));
 }
 
 /* ---- api key --------------------------------------------------------- */
@@ -403,9 +462,9 @@ function refreshSessions() {
 
     /* An empty list is ambiguous -- nothing dictated yet, or recording never
      * switched on? Say which. */
-    const recording = Config.load().history === "on";
+    const historyOn = Config.isOn(Config.load().history);
     emptyNote.set_visible(entries.length === 0);
-    emptyNote.set_label(recording
+    emptyNote.set_label(historyOn
         ? "no transcripts yet — hold your hotkey and speak"
         : "recording is off — set  history = on  in config.ini");
 

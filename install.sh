@@ -98,9 +98,19 @@ elif [ -t 0 ]; then
     stty echo 2>/dev/null || true
     printf '\n'
     if [ -n "$KEY" ]; then
+        # The key goes through the environment, not through the script text.
+        # Interpolating it into a sed replacement would let '|', '&' or a
+        # backslash in the key corrupt it silently -- '&' expands to the whole
+        # matched line -- and would put it in the process table for anyone
+        # running ps. awk reads it from ENVIRON and treats it as plain data.
         tmp="$(mktemp)"
-        sed "s|^[[:space:]]*api_key[[:space:]]*=.*|api_key      = $KEY|" \
-            "$CONFIG" > "$tmp"
+        chmod 600 "$tmp"
+        WHISPRD_KEY="$KEY" awk '
+            /^[[:space:]]*api_key[[:space:]]*=/ && !done {
+                print "api_key      = " ENVIRON["WHISPRD_KEY"]; done = 1; next
+            }
+            { print }
+        ' "$CONFIG" > "$tmp"
         mv "$tmp" "$CONFIG"
         chmod 600 "$CONFIG"
         echo "    key written to $CONFIG (0600)"
