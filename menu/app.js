@@ -104,12 +104,30 @@ const LAYOUTS = [
     { text: "fr — azerty",  layout: "fr", variant: "" },
 ];
 
+/* Only consulted for a modifier we did not see pressed -- if the user was
+ * already holding one when they clicked [set], the mask is all we have. A mask
+ * cannot say which side of the keyboard it came from, so it has to guess left.
+ * MOD_KEYS below is preferred wherever we watched the actual keypress. */
 const MODS = [
     [Gdk.ModifierType.CONTROL_MASK, "KEY_LEFTCTRL"],
     [Gdk.ModifierType.ALT_MASK,     "KEY_LEFTALT"],
     [Gdk.ModifierType.SHIFT_MASK,   "KEY_LEFTSHIFT"],
     [Gdk.ModifierType.SUPER_MASK,   "KEY_LEFTMETA"],
 ];
+
+/* Modifiers are keys in their own right as far as evdev and the daemon are
+ * concerned, and the daemon's own default hotkey is one of them
+ * (KEY_RIGHTCTRL). Left and right are distinct keycodes and the daemon checks
+ * the exact one it was given, so collapsing Control_R onto KEY_LEFTCTRL
+ * produces a chord that never fires. */
+const MOD_KEYS = {
+    Control_L: "KEY_LEFTCTRL",  Control_R: "KEY_RIGHTCTRL",
+    Shift_L:   "KEY_LEFTSHIFT", Shift_R:   "KEY_RIGHTSHIFT",
+    Alt_L:     "KEY_LEFTALT",   Alt_R:     "KEY_RIGHTALT",
+    Super_L:   "KEY_LEFTMETA",  Super_R:   "KEY_RIGHTMETA",
+    Meta_L:    "KEY_LEFTMETA",  Meta_R:    "KEY_RIGHTMETA",
+    ISO_Level3_Shift: "KEY_RIGHTALT",       /* AltGr */
+};
 
 /* Gdk key names and evdev key names are different namespaces that happen to
  * agree on letters, digits and a few others -- which is exactly what makes the
@@ -180,37 +198,66 @@ function persist() {
 
 /* ---- hotkey panel ---------------------------------------------------- */
 
+/* Modifiers pressed since recording began, in press order, as evdev names. */
+let heldMods = [];
+/* The modifier that would become the binding if it were released untouched. */
+let bareCandidate = null;
+
 function renderChips() {
     let c = chipRow.get_first_child();
     while (c) { const n = c.get_next_sibling(); chipRow.remove(c); c = n; }
 
+    const chips = (parts, cls) => parts.forEach((p, i) => {
+        if (i) chipRow.append(label("+", "chip-plus"));
+        chipRow.append(label(p.replace(/^KEY_/, "").toLowerCase(), cls));
+    });
+
     if (recording) {
-        chipRow.append(label("AWAITING INPUT…", "awaiting"));
+        /* Showing the modifiers as they go down is what makes the
+         * release-to-bind behaviour legible: the user sees "ctrl" appear and
+         * can either let go to bind it alone or press a key to extend it. */
+        if (heldMods.length) {
+            chips(heldMods, "chip");
+            chipRow.append(label("  release to bind, or press a key", "awaiting"));
+        } else {
+            chipRow.append(label("AWAITING INPUT…", "awaiting"));
+        }
         return;
     }
-    const parts = cfg.hotkey.split("+").map(s => s.trim()).filter(Boolean);
-    parts.forEach((p, i) => {
-        if (i) chipRow.append(label("+", "chip-plus"));
-        chipRow.append(label(p.replace(/^KEY_/, "").toLowerCase(), "chip"));
-    });
+    chips(cfg.hotkey.split("+").map(s => s.trim()).filter(Boolean), "chip");
 }
 
 function stopRecording() {
     recording = false;
+    heldMods = [];
+    bareCandidate = null;
     setBtn.set_label("[ set ]");
     setBtn.remove_css_class("recording");
     renderChips();
 }
 
 /* Writes [hotkey] only. The daemon owns the actual grab -- on Wayland a real
- * global grab lives in the compositor, so this just records the combo. */
+ * global grab lives in the compositor, so this just records the combo.
+ *
+ * A modifier press is ambiguous: Ctrl might be the whole binding, or the start
+ * of Ctrl+Space. Nothing at press time can tell the two apart, so a modifier is
+ * held as a candidate and settled on release -- came back up untouched, it was
+ * meant alone; something else was pressed first, it was a chord. Hold-to-talk
+ * on a bare modifier is the natural choice here and it is what the daemon
+ * defaults to, so refusing to record one made the default unreachable. */
 function captureCombo(keyval, state) {
     if (keyval === Gdk.KEY_Escape) { stopRecording(); return; }
 
     const name = Gdk.keyval_name(keyval);
     if (!name) return;
-    /* A bare modifier press starts a chord; it is not the chord itself. */
-    if (/^(Control|Alt|Shift|Super|Meta)_[LR]$/.test(name)) return;
+
+    const mod = MOD_KEYS[name];
+    if (mod) {
+        if (!heldMods.includes(mod)) heldMods.push(mod);
+        bareCandidate = mod;
+        renderChips();
+        return;
+    }
 
     const key = evdevName(name);
     if (!key) {
@@ -221,10 +268,45 @@ function captureCombo(keyval, state) {
         return;
     }
 
-    const parts = MODS.filter(([m]) => (state & m) !== 0).map(([, n]) => n);
-    parts.push(key);
-    cfg.hotkey = parts.join("+");
+    /* A real key ends the chord, so no modifier still down was meant alone. */
+    bareCandidate = null;
+    commit([...modifiersFor(state), key]);
+}
 
+/* Settles the bare-modifier case. */
+function releaseCombo(keyval) {
+    const name = Gdk.keyval_name(keyval);
+    if (!name) return;
+
+    const mod = MOD_KEYS[name];
+    if (!mod) return;
+
+    heldMods = heldMods.filter(m => m !== mod);
+    if (bareCandidate === mod) {
+        bareCandidate = null;
+        commit([mod]);
+    } else {
+        renderChips();
+    }
+}
+
+/* Physically observed modifiers win; the mask fills in any that were already
+ * down before recording started and so were never seen as a press. */
+function modifiersFor(state) {
+    const seen = new Set(heldMods);
+    const fromMask = MODS
+        .filter(([m]) => (state & m) !== 0)
+        .map(([, n]) => n)
+        /* KEY_LEFTCTRL from the mask is the same modifier as an observed
+         * KEY_RIGHTCTRL; do not list it twice. */
+        .filter(n => !seen.has(n) && !seen.has(n.replace("KEY_LEFT", "KEY_RIGHT")));
+    return [...heldMods, ...fromMask];
+}
+
+function commit(parts) {
+    cfg.hotkey = parts.join("+");
+    heldMods = [];
+    bareCandidate = null;
     stopRecording();
     persist();
 }
@@ -597,6 +679,11 @@ app.connect("activate", () => {
     }
 
     const keys = new Gtk.EventControllerKey();
+    /* Binding a bare modifier is decided when it comes back up, so recording
+     * needs the release events too. */
+    keys.connect("key-released", (_c, keyval) => {
+        if (recording) releaseCombo(keyval);
+    });
     keys.connect("key-pressed", (_c, keyval, _code, state) => {
         if (recording) { captureCombo(keyval, state); return true; }
 
