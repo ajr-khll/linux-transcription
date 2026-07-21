@@ -233,9 +233,9 @@ uinput device, fresh config. `SIGINT`/`SIGTERM` still exit.
 the way past to point at `$(PREFIX)/share/scribe-menu`, since `app.js` no
 longer sits beside it once it lands in `bin/`. `SCRIBE_MENU_DIR` overrides it.
 
-## Replaces `scribe-gui`
+## Replaces the old GTK4 GUI
 
-This took over from the GTK4 `scribe-gui`, which has been removed along with
+This took over from the GTK4 settings app, which has been removed along with
 `src/gui/` and the `WITH_GUI` build flag. It was a second editor of the same
 `config.ini` that rewrote the file from a fixed template with no `history` or
 `history_dir` field, so saving in it silently turned off transcript recording

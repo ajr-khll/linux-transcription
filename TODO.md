@@ -5,7 +5,7 @@ do and does not pretend to do; the READMEs describe what exists.
 
 ## Settings the menu cannot reach
 
-`scribe-menu` replaced the old GTK4 `scribe-gui`, and three settings lost
+`scribe-menu` replaced the old GTK4 settings app, and three settings lost
 their UI in the move. All three still work — the daemon reads them from
 `config.ini`, and `menu/src/config.js` keeps them in `KEYS[]` so the menu
 round-trips them untouched rather than dropping them on save. They just have
