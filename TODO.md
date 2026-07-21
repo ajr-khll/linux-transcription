@@ -3,6 +3,28 @@
 Known gaps, in rough order of how much they matter. Things the code does not
 do and does not pretend to do; the READMEs describe what exists.
 
+## The speech detector's thresholds are compile-time constants
+
+`VAD_SILENCE_PEAK` and `VAD_MIN_SPREAD_DB` in `src/vad.h` were measured on one
+machine: a USB camera mic against an onboard analog input with nothing plugged
+into it. The numbers that came out were 2.2 dB of spread for the idle USB mic,
+10.4 dB for the dead jack, and 24-30 dB for speech, so the threshold sits at 16.
+
+None of that is guaranteed to transfer. A noisier room, a quieter speaker, a
+gain-staged interface or a mic with AGC all move both numbers, and the failure
+is not symmetrical: too low wastes an API call on a nonsense transcript, too
+high silently eats what the user said. Right now the only fix is editing a
+header and rebuilding, which is not a fix a user has.
+
+- Both should be config keys, read at `audio_init` alongside `source`.
+- `scribe --list-sources` already samples every device; it could print the
+  spread next to the peak and suggest a threshold, so picking a value is a
+  reading exercise rather than a guess.
+- `test_vad <file.wav>` prints what a recording measures and is the tuning tool
+  today. Whatever ships should point at it, or absorb it.
+- The menu should expose them too, though probably as one "how strict" control
+  rather than two decibel figures.
+
 ## Settings the menu cannot reach
 
 `scribe-menu` replaced the old GTK4 settings app, and three settings lost
@@ -37,8 +59,8 @@ or lose work.
 
 - **No spend limit.** Nothing caps requests. A stuck hotkey, or a hotkey bound
   to a key you actually type, uploads audio continuously and bills for it. The
-  100 ms minimum and the 2% silence guard help, but neither is a budget. A
-  daily request cap in the config would be a small change.
+  100 ms minimum, the 2% silence guard and the envelope test help, but none of
+  them is a budget. A daily request cap in the config would be a small change.
 - **A failed request loses the transcript.** `transcribe_pcm` logs the error
   and returns NULL; the worker drops it. On a local server that meant a lost
   utterance on a machine you controlled. Against a network endpoint it means

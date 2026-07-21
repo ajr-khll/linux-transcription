@@ -150,11 +150,23 @@ scribe --list-sources          # samples each device and prints its peak level
 ```
 
 If transcripts come back as plausible nonsense — `you`, `Thank you.`, `Subtitles by
-the Amara.org community` — you are recording silence from the wrong source. Whisper
-does not return an empty string for silent audio; it emits caption boilerplate
-memorised from training. scribe guards against this by refusing any utterance peaking
-below 2% of full scale. A live microphone reads well above that; an unplugged jack
-sits below it.
+the Amara.org community` — you are recording the wrong source. Whisper does not return
+an empty string for audio with no voice in it; it emits caption boilerplate memorised
+from training. scribe refuses two kinds of utterance before spending a request on them:
+
+- **Silent.** Peaks below 2% of full scale. A live microphone reads well above that;
+  an unplugged jack sits below it.
+- **Flat.** Loud enough, but the level barely moves — hiss, a fan, an analog input
+  with nothing plugged into it. Speech swings 24 dB or more between syllable and
+  pause; the noise floors measured here swing 2 to 10. The cut is at 16 dB.
+
+Both rejections log what they measured, so `journalctl --user -u scribe` says which
+test failed and by how much.
+
+The stream is pinned to the source you name, so the audio server cannot quietly move
+scribe to another microphone mid-session. The cost of that: unplugging the configured
+mic stops capture outright rather than migrating it. scribe says so in the log, and
+picks the device up again on `systemctl --user reload scribe`.
 
 ## Run
 
