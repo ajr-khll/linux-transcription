@@ -652,7 +652,7 @@ app.connect("activate", () => {
         application: app,
         css_classes: ["scribe-menu"],
         /* Without this the compositor shows "gjs" in alt-tab and window lists. */
-        title: "scribe",
+        title: "Scribe",
         default_width: W, default_height: H,
         resizable: false,
         /* The design draws its own 1px border and 8px radius; server-side

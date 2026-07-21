@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=scribe
+Name=Scribe
 GenericName=Voice Transcription
 Comment=Settings and transcript history for hold-to-talk dictation
 Exec=scribe-menu

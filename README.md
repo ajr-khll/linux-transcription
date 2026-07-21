@@ -1,4 +1,4 @@
-# scribe
+# Scribe
 
 Hold-to-talk voice transcription for Linux. Press and hold a key, speak, release —
 the text lands in whatever window has focus.
