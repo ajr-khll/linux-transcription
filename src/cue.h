@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 AJ Khullar
  *
- * whisprd -- hold-to-talk voice transcription for Linux.
+ * scribe -- hold-to-talk voice transcription for Linux.
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 3, as published
  * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
@@ -13,7 +13,7 @@
 #include "config.h"
 
 /* Short audio cues so the user can tell, without looking at anything, which
- * state whisprd is in. */
+ * state scribe is in. */
 enum cue_kind {
     CUE_START,      /* hotkey down: listening */
     CUE_STOP,       /* hotkey up: captured, uploading */

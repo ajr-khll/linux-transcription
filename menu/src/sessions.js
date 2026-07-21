@@ -13,7 +13,7 @@ export function dir() {
     const base = xdg && xdg.length
         ? xdg
         : GLib.build_filenamev([GLib.get_home_dir(), ".local", "share"]);
-    return GLib.build_filenamev([base, "whisprd", "transcriptions"]);
+    return GLib.build_filenamev([base, "scribe", "transcriptions"]);
 }
 
 /* 612w / 3.2kw, matching the design. */

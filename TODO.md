@@ -5,7 +5,7 @@ do and does not pretend to do; the READMEs describe what exists.
 
 ## Settings the menu cannot reach
 
-`scribe-menu` replaced the old GTK4 `whisprd-gui`, and three settings lost
+`scribe-menu` replaced the old GTK4 `scribe-gui`, and three settings lost
 their UI in the move. All three still work — the daemon reads them from
 `config.ini`, and `menu/src/config.js` keeps them in `KEYS[]` so the menu
 round-trips them untouched rather than dropping them on save. They just have
@@ -16,7 +16,7 @@ no panel, and the defaults are what most people want.
   in an `─ injection ─` field beside the layout selector.
 - **`paste_chord`** — only consulted by the `clipboard` backend, and only
   wrong in terminals, which usually want `ctrl+shift+v`. Same field.
-- **Test injection** — `whisprd --say TEXT` confirms the backend works without
+- **Test injection** — `scribe --say TEXT` confirms the backend works without
   speaking. The old GUI had a button for it; the CLI flag is unchanged. Worth
   a `[ test ]` button next to the backend dropdown.
 
@@ -27,7 +27,7 @@ no panel, and the defaults are what most people want.
 - The unit is `WantedBy=graphical-session.target`, which GNOME and KDE reach
   and bare Hyprland/sway/river frequently do not — `enable` then links a unit
   nothing ever starts. `install.sh` detects this and prints the fix rather than
-  rewriting the unit, since `default.target` would start whisprd on TTY logins
+  rewriting the unit, since `default.target` would start scribe on TTY logins
   too. A `uwsm`-aware unit, or a documented `exec-once`, is the real answer.
 
 ## Cost and failure, now that every utterance is a paid API call
@@ -73,7 +73,7 @@ three ways, all textual and none checked at build time:
 - **The live feed** greps `journalctl` for the `transcript:` prefix written at
   `src/main.c:59`. Changing that string breaks the feed with no error.
 - **Status** is `systemctl --user is-active`, so it reads inactive whenever
-  whisprd runs outside systemd.
+  scribe runs outside systemd.
 
 A real IPC surface would remove all three. That is a pre-1.0 decision, not a
 packaging one.

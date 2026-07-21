@@ -3,7 +3,7 @@
 hotkey = KEY_RIGHTCTRL
 
 # --- openai ---
-# REQUIRED. whisprd will not start without a key.
+# REQUIRED. scribe will not start without a key.
 # Get one at https://platform.openai.com/api-keys
 #
 # $OPENAI_API_KEY in the environment overrides this line. Prefer that if you
@@ -36,14 +36,14 @@ source =
 # Consecutive utterances share a file until 5 minutes of silence starts a new
 # one; the file is named after the first thing said in it.
 history = off
-# empty = ~/.local/share/whisprd/transcriptions (honours XDG_DATA_HOME)
+# empty = ~/.local/share/scribe/transcriptions (honours XDG_DATA_HOME)
 history_dir =
 
 # --- cues ---
 # on = play a short tone so you can dictate without watching the screen: a
 # rising pair when the hotkey goes down (listening), a falling pair when it
 # comes up (captured), a low double beep when nothing usable came back. Needs
-# paplay from pulseaudio-utils, which whisprd already uses for capture.
+# paplay from pulseaudio-utils, which scribe already uses for capture.
 audio_cues = on
 
 # --- injection ---

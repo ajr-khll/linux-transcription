@@ -1,5 +1,5 @@
 #!/bin/sh
-# whisprd installer. Run from a checkout:  ./install.sh
+# scribe installer. Run from a checkout:  ./install.sh
 #
 # Deliberately not a curl|bash one-liner. This needs sudo for /usr/local and
 # for the input group, and piping an unread script into a shell that then asks
@@ -7,14 +7,14 @@
 set -eu
 
 PREFIX="${PREFIX:-/usr/local}"
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/whisprd"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/scribe"
 CONFIG="$CONFIG_DIR/config.ini"
 
 say()  { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 warn() { printf '\033[33m    %s\033[0m\n' "$1"; }
 die()  { printf '\033[31merror: %s\033[0m\n' "$1" >&2; exit 1; }
 
-[ -f Makefile ] && [ -d src ] || die "run this from the whisprd source directory"
+[ -f Makefile ] && [ -d src ] || die "run this from the scribe source directory"
 [ "$(id -u)" -ne 0 ] || die "do not run this as root; it will sudo where needed"
 
 # ---- dependencies ----------------------------------------------------------
@@ -53,7 +53,7 @@ say "installing to $PREFIX"
 sudo make install "PREFIX=$PREFIX"
 
 # ---- permissions -----------------------------------------------------------
-# whisprd reads /dev/input/event* and writes /dev/uinput. It must NOT run as
+# scribe reads /dev/input/event* and writes /dev/uinput. It must NOT run as
 # root, so the user joins the input group instead.
 say "permissions"
 if id -nG | tr ' ' '\n' | grep -qx input; then
@@ -67,7 +67,7 @@ fi
 
 if ! stat -c '%G' /dev/uinput 2>/dev/null | grep -qx input; then
     warn "/dev/uinput is not group 'input'; installing the udev rule"
-    sudo cp udev/99-whisprd.rules /etc/udev/rules.d/
+    sudo cp udev/99-scribe.rules /etc/udev/rules.d/
     sudo udevadm control --reload && sudo udevadm trigger
 fi
 
@@ -78,7 +78,7 @@ chmod 700 "$CONFIG_DIR"
 if [ -f "$CONFIG" ]; then
     echo "    keeping existing $CONFIG"
 else
-    cp "$PREFIX/share/whisprd/config.ini.example" "$CONFIG"
+    cp "$PREFIX/share/scribe/config.ini.example" "$CONFIG"
     chmod 600 "$CONFIG"
     echo "    wrote $CONFIG"
 fi
@@ -115,10 +115,10 @@ elif [ -t 0 ]; then
         chmod 600 "$CONFIG"
         echo "    key written to $CONFIG (0600)"
     else
-        warn "no key set; whisprd will not start until you add one"
+        warn "no key set; scribe will not start until you add one"
     fi
 else
-    warn "no key set; whisprd will not start until you add one"
+    warn "no key set; scribe will not start until you add one"
 fi
 
 # ---- service ---------------------------------------------------------------
@@ -127,29 +127,29 @@ fi
 # `enable` links the unit and nothing ever starts it.
 say "service"
 systemctl --user daemon-reload
-systemctl --user enable whisprd.service
+systemctl --user enable scribe.service
 
 if systemctl --user is-active --quiet graphical-session.target; then
     if [ "${NEED_LOGOUT:-0}" -eq 0 ]; then
-        systemctl --user restart whisprd.service || \
-            warn "the unit did not start; check: journalctl --user -u whisprd -n 30"
+        systemctl --user restart scribe.service || \
+            warn "the unit did not start; check: journalctl --user -u scribe -n 30"
     fi
 else
     warn "graphical-session.target is not active on this session."
     warn "The unit is enabled but your compositor will never start it."
     warn "Either launch your compositor under uwsm, or add to its autostart:"
-    warn "    systemctl --user start whisprd.service"
+    warn "    systemctl --user start scribe.service"
 fi
 
 # ---- done ------------------------------------------------------------------
 say "installed"
 cat <<EOF
-    whisprd        the daemon (systemd user service)
+    scribe        the daemon (systemd user service)
     scribe-menu   settings and history panel
 
 Next:
-    whisprd --list-sources     pick a microphone, set 'source' in the config
-    whisprd --say "hello"      test injection without speaking
+    scribe --list-sources     pick a microphone, set 'source' in the config
+    scribe --say "hello"      test injection without speaking
     scribe-menu               open the panel
 
 Bind scribe-menu to a key in your compositor -- see menu/README.md.
@@ -157,7 +157,7 @@ EOF
 
 if [ "${NEED_LOGOUT:-0}" -eq 1 ]; then
     printf '\n\033[33m'
-    echo "You must log out and back in before whisprd can run."
+    echo "You must log out and back in before scribe can run."
     echo "Group membership is read when your session starts, so the service"
     echo "will fail on /dev/uinput until then. A new shell is not enough."
     printf '\033[0m'

@@ -1,6 +1,6 @@
 # scribe-menu
 
-Floating settings + history panel for the whisprd daemon — design `4b`, built
+Floating settings + history panel for the scribe daemon — design `4b`, built
 on GJS + GTK4.
 
 ```
@@ -29,7 +29,7 @@ Without the font the layout is correct but rendered in the wrong typeface.
 **Astal is not required.** `app.js` imports none of it, and `src/audio.js` treats
 `AstalWp` as an optional fallback for device names. This matters for packaging:
 the `astal*` packages live only in the `solopasha/hyprland` COPR, so depending
-on them would keep whisprd out of any ordinary repository.
+on them would keep scribe out of any ordinary repository.
 
 > Fedora's `dnf install ags` is **Adventure Game Studio**, an unrelated project
 > that happens to share the name.
@@ -40,8 +40,8 @@ The panel is a normal toplevel: movable, focusable, alt-tabbable, and
 targetable by window rules. It identifies as:
 
 ```
-app_id / class : dev.whisprd.Menu
-title          : whisprd
+app_id / class : dev.scribe.Menu
+title          : scribe
 size           : 940x566, non-resizable
 ```
 
@@ -52,23 +52,23 @@ control moves the window.
 ### Hyprland
 
 ```
-windowrulev2 = float,        class:^(dev\.whisprd\.Menu)$
-windowrulev2 = size 940 566, class:^(dev\.whisprd\.Menu)$
-windowrulev2 = center,       class:^(dev\.whisprd\.Menu)$
+windowrulev2 = float,        class:^(dev\.scribe\.Menu)$
+windowrulev2 = size 940 566, class:^(dev\.scribe\.Menu)$
+windowrulev2 = center,       class:^(dev\.scribe\.Menu)$
 bind = SUPER, W, exec, /usr/local/bin/scribe-menu
 ```
 
 ### Sway
 
 ```
-for_window [app_id="dev.whisprd.Menu"] floating enable, resize set 940 566, move position center
+for_window [app_id="dev.scribe.Menu"] floating enable, resize set 940 566, move position center
 bindsym $mod+w exec /usr/local/bin/scribe-menu
 ```
 
 ### i3 (X11)
 
 ```
-for_window [class="dev.whisprd.Menu"] floating enable, resize set 940 566, move position center
+for_window [class="dev.scribe.Menu"] floating enable, resize set 940 566, move position center
 bindsym $mod+w exec /usr/local/bin/scribe-menu
 ```
 
@@ -96,19 +96,19 @@ process that logs to stderr. Everything here binds to what actually exists:
 
 | Panel | Source | Real? |
 |---|---|---|
-| status dot | `systemctl --user is-active whisprd` | yes |
-| live transcript feed | `journalctl --user -u whisprd -f`, matching the `transcript:` prefix written by `src/main.c` | yes |
+| status dot | `systemctl --user is-active scribe` | yes |
+| live transcript feed | `journalctl --user -u scribe -f`, matching the `transcript:` prefix written by `src/main.c` | yes |
 | microphone list | `pactl list sources` | yes |
 | level meter | `parec` on the selected device, 48 bars at ~31fps | yes |
-| all five settings panels | `~/.config/whisprd/config.ini` | yes |
+| all five settings panels | `~/.config/scribe/config.ini` | yes |
 | config reload | `SIGHUP` to the daemon | yes |
-| recent sessions, file count, open, delete | `~/.local/share/whisprd/transcriptions` | yes |
+| recent sessions, file count, open, delete | `~/.local/share/scribe/transcriptions` | yes |
 
 ### The level meter
 
 `parec` on the selected device at 16 kHz mono — the same rate the daemon
 captures at — RMS per ~32 ms chunk, so it updates at about 31 fps and reflects
-what whisprd actually hears. Bars scroll right-to-left, so the meter reads as
+what scribe actually hears. Bars scroll right-to-left, so the meter reads as
 recent history rather than one number smeared across 48 columns.
 
 The silence threshold is learned rather than fixed. Noise floors vary far more
@@ -165,7 +165,7 @@ sandboxes) it falls back to a real delete.
 
 ## Config
 
-Reads and writes `~/.config/whisprd/config.ini` in the daemon's own format:
+Reads and writes `~/.config/scribe/config.ini` in the daemon's own format:
 flat `key = value` lines, no section headers. `GLib.KeyFile` is deliberately
 not used — it requires a group header, and writing one would make the daemon
 log a warning on every start.
@@ -233,15 +233,15 @@ uinput device, fresh config. `SIGINT`/`SIGTERM` still exit.
 the way past to point at `$(PREFIX)/share/scribe-menu`, since `app.js` no
 longer sits beside it once it lands in `bin/`. `SCRIBE_MENU_DIR` overrides it.
 
-## Replaces `whisprd-gui`
+## Replaces `scribe-gui`
 
-This took over from the GTK4 `whisprd-gui`, which has been removed along with
+This took over from the GTK4 `scribe-gui`, which has been removed along with
 `src/gui/` and the `WITH_GUI` build flag. It was a second editor of the same
 `config.ini` that rewrote the file from a fixed template with no `history` or
 `history_dir` field, so saving in it silently turned off transcript recording
 this panel had enabled.
 
 Three of its settings have no panel here yet — `backend`, `paste_chord`, and the
-`whisprd --say` injection test. The daemon still reads all three, and
+`scribe --say` injection test. The daemon still reads all three, and
 `src/config.js` keeps them in `KEYS[]` so they survive a save untouched; they
 just need hand-editing for now. See `TODO.md`.

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 AJ Khullar
  *
- * whisprd -- hold-to-talk voice transcription for Linux.
+ * scribe -- hold-to-talk voice transcription for Linux.
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 3, as published
  * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
@@ -115,7 +115,7 @@ static void utt_seal(void)
     if (peak < SILENCE_PEAK) {
         log_warn("utterance peaked at %.1f%% of full scale: treating as silence, "
                  "not transcribing\n", peak / 327.68);
-        log_warn("if you were speaking, whisprd is on the wrong capture source; "
+        log_warn("if you were speaking, scribe is on the wrong capture source; "
                  "set 'source =' in the config (see: pactl list short sources)\n");
         cue_play(CUE_ERROR);
         utt_n = 0;
@@ -189,7 +189,7 @@ int audio_init(const config *cfg, queue *out)
 
     int err;
     const char *dev = cfg->source[0] ? cfg->source : NULL;
-    stream = pa_simple_new(NULL, "whisprd", PA_STREAM_RECORD, dev,
+    stream = pa_simple_new(NULL, "scribe", PA_STREAM_RECORD, dev,
                            "voice transcription", &ss, NULL, &attr, &err);
     if (!stream) {
         log_err("cannot open capture stream%s%s: %s\n",
@@ -247,7 +247,7 @@ int audio_measure_peak(const char *source, int ms)
         .format = PA_SAMPLE_S16LE, .rate = AUDIO_RATE, .channels = 1,
     };
     int err;
-    pa_simple *s = pa_simple_new(NULL, "whisprd", PA_STREAM_RECORD, source,
+    pa_simple *s = pa_simple_new(NULL, "scribe", PA_STREAM_RECORD, source,
                                  "level check", &ss, NULL, NULL, &err);
     if (!s)
         return -1;
@@ -275,7 +275,7 @@ audio_source *audio_enumerate_sources(size_t *n_out)
     pa_mainloop *ml = pa_mainloop_new();
     if (!ml)
         return NULL;
-    pa_context *ctx = pa_context_new(pa_mainloop_get_api(ml), "whisprd");
+    pa_context *ctx = pa_context_new(pa_mainloop_get_api(ml), "scribe");
     if (!ctx || pa_context_connect(ctx, NULL, PA_CONTEXT_NOFLAGS, NULL) < 0) {
         log_err("cannot connect to the audio server\n");
         if (ctx)
@@ -337,7 +337,7 @@ int audio_list_sources(void)
     printf("\nPut the name of the source you want in config as:  source = <name>\n");
     printf("A live microphone reads well above %.1f%%; anything at or below that is\n",
            SILENCE_PEAK / 327.68);
-    printf("silence, and whisprd will refuse to transcribe from it.\n");
+    printf("silence, and scribe will refuse to transcribe from it.\n");
 
     free(v);
     return 0;

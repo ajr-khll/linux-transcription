@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 AJ Khullar
  *
- * whisprd -- hold-to-talk voice transcription for Linux.
+ * scribe -- hold-to-talk voice transcription for Linux.
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 3, as published
  * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
@@ -11,7 +11,7 @@
  * comes up, a low double beep when nothing usable came back. That is enough to
  * dictate without watching the screen.
  *
- * whisprd links no audio-output library. It already needs pulseaudio-utils for
+ * scribe links no audio-output library. It already needs pulseaudio-utils for
  * capture diagnostics, so the tone is synthesised here and the raw PCM piped to
  * `paplay --raw`. No bundled sound files, no new dependency, and tones we
  * control. */
@@ -61,7 +61,7 @@ void cue_init(const config *cfg)
     enabled = false;
     if (!cfg->audio_cues)
         return;
-    /* paplay ships in pulseaudio-utils, which whisprd already needs, but a
+    /* paplay ships in pulseaudio-utils, which scribe already needs, but a
      * headless box may not have it. Check once, so we neither spam a failing
      * exec on every keypress nor stay quiet about why there is no sound. */
     if (!find_player(player, sizeof(player))) {

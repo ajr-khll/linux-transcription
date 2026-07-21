@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 AJ Khullar
  *
- * whisprd -- hold-to-talk voice transcription for Linux.
+ * scribe -- hold-to-talk voice transcription for Linux.
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 3, as published
  * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
@@ -33,9 +33,9 @@ static void default_dir(char *out, size_t n)
 {
     const char *xdg = getenv("XDG_DATA_HOME");
     if (xdg && *xdg)
-        snprintf(out, n, "%s/whisprd/transcriptions", xdg);
+        snprintf(out, n, "%s/scribe/transcriptions", xdg);
     else
-        snprintf(out, n, "%s/.local/share/whisprd/transcriptions",
+        snprintf(out, n, "%s/.local/share/scribe/transcriptions",
                  getenv("HOME") ? getenv("HOME") : ".");
 }
 

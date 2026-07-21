@@ -1,11 +1,11 @@
 [Unit]
-Description=whisprd hold-to-talk transcription daemon
+Description=scribe hold-to-talk transcription daemon
 After=graphical-session.target
 PartOf=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=@BINDIR@/whisprd
+ExecStart=@BINDIR@/scribe
 Restart=on-failure
 RestartSec=2
 

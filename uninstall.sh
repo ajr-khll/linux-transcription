@@ -1,25 +1,25 @@
 #!/bin/sh
-# whisprd uninstaller. Run from the source directory:  ./uninstall.sh
+# scribe uninstaller. Run from the source directory:  ./uninstall.sh
 set -eu
 
 PREFIX="${PREFIX:-/usr/local}"
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/whisprd"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/scribe"
 
 say()  { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 warn() { printf '\033[33m    %s\033[0m\n' "$1"; }
 
-[ -f Makefile ] && [ -d src ] || { printf '\033[31merror: run this from the whisprd source directory\033[0m\n' >&2; exit 1; }
+[ -f Makefile ] && [ -d src ] || { printf '\033[31merror: run this from the scribe source directory\033[0m\n' >&2; exit 1; }
 [ "$(id -u)" -ne 0 ] || { printf '\033[31merror: do not run this as root; it will sudo where needed\033[0m\n' >&2; exit 1; }
 
 # ---- service ---------------------------------------------------------------
 say "stopping service"
-if systemctl --user is-active --quiet whisprd.service 2>/dev/null; then
-    systemctl --user stop whisprd.service
-    echo "    stopped whisprd.service"
+if systemctl --user is-active --quiet scribe.service 2>/dev/null; then
+    systemctl --user stop scribe.service
+    echo "    stopped scribe.service"
 fi
-if systemctl --user is-enabled --quiet whisprd.service 2>/dev/null; then
-    systemctl --user disable whisprd.service
-    echo "    disabled whisprd.service"
+if systemctl --user is-enabled --quiet scribe.service 2>/dev/null; then
+    systemctl --user disable scribe.service
+    echo "    disabled scribe.service"
 fi
 systemctl --user daemon-reload
 
@@ -30,7 +30,7 @@ systemctl --user daemon-reload
 
 # ---- udev rule -------------------------------------------------------------
 say "udev rule"
-RULE=/etc/udev/rules.d/99-whisprd.rules
+RULE=/etc/udev/rules.d/99-scribe.rules
 if [ -f "$RULE" ]; then
     sudo rm -f "$RULE"
     sudo udevadm control --reload

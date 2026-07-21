@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 AJ Khullar
  *
- * whisprd -- hold-to-talk voice transcription for Linux.
+ * scribe -- hold-to-talk voice transcription for Linux.
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 3, as published
  * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
@@ -106,7 +106,7 @@ int transcribe_init(const config *cfg)
      * as a 401 buried in the journal, long after they stopped watching. */
     if (!cfg->api_key[0]) {
         log_err("no API key. Set one of:\n"
-                "  api_key = sk-...   in ~/.config/whisprd/config.ini\n"
+                "  api_key = sk-...   in ~/.config/scribe/config.ini\n"
                 "  export OPENAI_API_KEY=sk-...   (takes precedence)\n"
                 "Get a key at https://platform.openai.com/api-keys\n");
         return -1;
@@ -152,7 +152,7 @@ char *transcribe_pcm(const int16_t *samples, size_t n_samples)
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &resp);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 120L);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "whisprd/" SCRIBE_VERSION);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "scribe/" SCRIBE_VERSION);
 
     char *text = NULL;
     CURLcode rc = curl_easy_perform(curl);

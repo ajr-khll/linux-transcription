@@ -48,7 +48,7 @@ OBJ := $(patsubst %.c,$(BUILD)/%.o,$(SRC)) $(patsubst $(BUILD)/%.c,$(BUILD)/%.o,
 
 .PHONY: all clean install uninstall test
 
-all: $(BUILD)/whisprd
+all: $(BUILD)/scribe
 
 # These two cover the parts most likely to be subtly wrong, and need neither a
 # compositor nor a network: JSON unescaping, and whether the keymap we generate
@@ -66,7 +66,7 @@ test: $(PROTO_H) $(PROTO_C)
 	@echo "--- keymap ---" && $(BUILD)/test_keymap
 	@echo "--- layout ---" && $(BUILD)/test_layout
 
-$(BUILD)/whisprd: $(OBJ)
+$(BUILD)/scribe: $(OBJ)
 	$(CC) $(OBJ) $(LDFLAGS) $(LDLIBS) -o $@
 
 # Generated protocol glue must exist before anything that includes it compiles.
@@ -90,21 +90,21 @@ clean:
 	rm -rf $(BUILD)
 
 install: all
-	install -Dm755 $(BUILD)/whisprd $(DESTDIR)$(PREFIX)/bin/whisprd
-	install -Dm644 config.ini.example $(DESTDIR)$(PREFIX)/share/whisprd/config.ini.example
+	install -Dm755 $(BUILD)/scribe $(DESTDIR)$(PREFIX)/bin/scribe
+	install -Dm644 config.ini.example $(DESTDIR)$(PREFIX)/share/scribe/config.ini.example
 	# The unit is templated at install time; hardcoding /usr/local/bin would
 	# ship a broken unit for any non-default PREFIX.
-	sed 's|@BINDIR@|$(PREFIX)/bin|' systemd/whisprd.service.in > $(BUILD)/whisprd.service
-	install -Dm644 $(BUILD)/whisprd.service $(DESTDIR)$(PREFIX)/lib/systemd/user/whisprd.service
+	sed 's|@BINDIR@|$(PREFIX)/bin|' systemd/scribe.service.in > $(BUILD)/scribe.service
+	install -Dm644 $(BUILD)/scribe.service $(DESTDIR)$(PREFIX)/lib/systemd/user/scribe.service
 ifeq ($(WITH_MENU),1)
 	$(MAKE) -C menu install PREFIX=$(PREFIX) DESTDIR=$(DESTDIR)
-	install -Dm644 desktop/dev.whisprd.Menu.desktop \
-	    $(DESTDIR)$(PREFIX)/share/applications/dev.whisprd.Menu.desktop
+	install -Dm644 desktop/dev.scribe.Menu.desktop \
+	    $(DESTDIR)$(PREFIX)/share/applications/dev.scribe.Menu.desktop
 endif
 
 uninstall:
-	rm -f $(DESTDIR)$(PREFIX)/bin/whisprd
-	rm -f $(DESTDIR)$(PREFIX)/share/applications/dev.whisprd.Menu.desktop
-	rm -f $(DESTDIR)$(PREFIX)/lib/systemd/user/whisprd.service
-	rm -rf $(DESTDIR)$(PREFIX)/share/whisprd
+	rm -f $(DESTDIR)$(PREFIX)/bin/scribe
+	rm -f $(DESTDIR)$(PREFIX)/share/applications/dev.scribe.Menu.desktop
+	rm -f $(DESTDIR)$(PREFIX)/lib/systemd/user/scribe.service
+	rm -rf $(DESTDIR)$(PREFIX)/share/scribe
 	$(MAKE) -C menu uninstall PREFIX=$(PREFIX) DESTDIR=$(DESTDIR)

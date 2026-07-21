@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=whisprd
+Name=scribe
 GenericName=Voice Transcription
 Comment=Settings and transcript history for hold-to-talk dictation
 Exec=scribe-menu
@@ -8,4 +8,4 @@ Icon=audio-input-microphone
 Terminal=false
 Categories=Utility;Accessibility;
 Keywords=voice;speech;transcription;dictation;whisper;
-StartupWMClass=dev.whisprd.Menu
+StartupWMClass=dev.scribe.Menu

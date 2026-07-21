@@ -1,4 +1,4 @@
-/* Client side of the existing whisprd daemon.
+/* Client side of the existing scribe daemon.
  *
  * The daemon exposes no socket and no D-Bus interface -- it is a hold-to-talk
  * process that logs to stderr. So "status" is the systemd user unit's state,
@@ -8,7 +8,7 @@
 import GLib from "gi://GLib";
 import Gio from "gi://Gio";
 
-const UNIT = "whisprd.service";
+const UNIT = "scribe.service";
 
 /* ---- status -------------------------------------------------------- */
 
@@ -25,7 +25,7 @@ export function isActive() {
 /* ---- config reload ------------------------------------------------- */
 
 /* The daemon re-reads its config on SIGHUP. Falls back to a unit restart if
- * whisprd is running outside systemd or the signal cannot be delivered. */
+ * scribe is running outside systemd or the signal cannot be delivered. */
 export function reload() {
     try {
         const [, , , status] = GLib.spawn_sync(
@@ -35,7 +35,7 @@ export function reload() {
     } catch (_) { /* fall through */ }
 
     try {
-        GLib.spawn_command_line_sync(`pkill -HUP -x whisprd`);
+        GLib.spawn_command_line_sync(`pkill -HUP -x scribe`);
         return "reloaded";
     } catch (_) {
         return "failed";
@@ -45,7 +45,7 @@ export function reload() {
 /* ---- live transcript feed ------------------------------------------ */
 
 /* Follows the journal for the user unit and emits the text of each
- * "whisprd: transcript: ..." line. That prefix is written by the worker
+ * "scribe: transcript: ..." line. That prefix is written by the worker
  * thread in src/main.c; if it ever changes, change it here too. */
 export class Feed {
     constructor(onLine) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env -S gjs -m
 /* scribe-menu -- design 4b.
  *
- * A floating, centred settings + history panel for the whisprd daemon.
+ * A floating, centred settings + history panel for the scribe daemon.
  * Run:  gjs -m app.js       (from this directory)
  *
  * Layer-shell places and sizes the window itself, so unlike a terminal build
@@ -365,7 +365,7 @@ function buildLeft() {
 
     const header = box("v", 2, null, [
         box("h", 0, null, [
-            label("whisprd", "host"), label("@linux", "host-domain"),
+            label("scribe", "host"), label("@linux", "host-domain"),
             label("  ·  ", "host-sep"), statusDot, label(" ", null), statusTxt,
             label("  ·  ", "host-sep"), label("pipewire", null),
         ]),
@@ -638,7 +638,7 @@ function startRuntime() {
 /* ---- application ----------------------------------------------------- */
 
 const app = new Gtk.Application({
-    application_id: "dev.whisprd.Menu",
+    application_id: "dev.scribe.Menu",
     flags: Gio.ApplicationFlags.FLAGS_NONE,
 });
 
@@ -652,7 +652,7 @@ app.connect("activate", () => {
         application: app,
         css_classes: ["scribe-menu"],
         /* Without this the compositor shows "gjs" in alt-tab and window lists. */
-        title: "whisprd",
+        title: "scribe",
         default_width: W, default_height: H,
         resizable: false,
         /* The design draws its own 1px border and 8px radius; server-side

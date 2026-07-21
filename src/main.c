@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 AJ Khullar
  *
- * whisprd -- hold-to-talk voice transcription for Linux.
+ * scribe -- hold-to-talk voice transcription for Linux.
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 3, as published
  * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
@@ -89,11 +89,11 @@ static void on_signal(int sig)
 static void usage(void)
 {
     fprintf(stderr,
-        "usage: whisprd [-c CONFIG] [-p] [-v]\n"
-        "       whisprd --say TEXT      inject TEXT and exit (tests injection)\n"
-        "       whisprd --list-sources  show capture devices and their levels\n"
+        "usage: scribe [-c CONFIG] [-p] [-v]\n"
+        "       scribe --say TEXT      inject TEXT and exit (tests injection)\n"
+        "       scribe --list-sources  show capture devices and their levels\n"
         "\n"
-        "  -c FILE  config file (default $XDG_CONFIG_HOME/whisprd/config.ini)\n"
+        "  -c FILE  config file (default $XDG_CONFIG_HOME/scribe/config.ini)\n"
         "  -p       print transcripts to stdout instead of injecting them\n"
         "  -v       verbose logging\n"
         "  -V       print version and exit\n"
@@ -137,7 +137,7 @@ int main(int argc, char **argv)
         case 'v': log_verbose = 1; break;
         case 's': say_text = optarg; break;
         case 'L': list_sources = true; break;
-        case 'V': printf("whisprd %s\n", SCRIBE_VERSION); return 0;
+        case 'V': printf("scribe %s\n", SCRIBE_VERSION); return 0;
         default:  usage(); return opt == 'h' ? 0 : 2;
         }
     }
