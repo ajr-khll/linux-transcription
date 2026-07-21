@@ -1,4 +1,4 @@
-/* Read/write ~/.config/whisprd/config.ini.
+/* Read/write ~/.config/scribe/config.ini.
  *
  * The daemon's parser (src/config.c) reads flat `key = value` lines with no
  * section headers, so GLib.KeyFile is unusable here -- it requires a group
@@ -16,7 +16,7 @@ export const KEYS = [
 ];
 
 /* The daemon accepts four spellings for on (src/config.c), so a file written by
- * hand with `history = true` is on as far as whisprd is concerned. Comparing
+ * hand with `history = true` is on as far as scribe is concerned. Comparing
  * against the string "on" alone reports it as off. */
 export function isOn(value) {
     return ["on", "true", "yes", "1"].includes(String(value ?? "").trim().toLowerCase());
@@ -25,7 +25,7 @@ export function isOn(value) {
 export function path() {
     const xdg = GLib.getenv("XDG_CONFIG_HOME");
     const base = xdg && xdg.length ? xdg : GLib.build_filenamev([GLib.get_home_dir(), ".config"]);
-    return GLib.build_filenamev([base, "whisprd", "config.ini"]);
+    return GLib.build_filenamev([base, "scribe", "config.ini"]);
 }
 
 /* Mirrors the daemon's defaults in config_load(), so an absent file shows the
@@ -91,7 +91,7 @@ export function save(cfg) {
     GLib.mkdir_with_parents(dir, 0o700);
 
     const out =
-`# whisprd configuration -- written by whisprd-menu
+`# scribe configuration -- written by scribe-menu
 
 # --- hotkey ---
 # evdev key name to hold. Single key or "MOD+KEY".
@@ -104,7 +104,7 @@ source = ${cfg.source}
 # --- history ---
 # on = keep every transcript on disk, for the menu's session list.
 history = ${cfg.history}
-# empty = ~/.local/share/whisprd/transcriptions
+# empty = ~/.local/share/scribe/transcriptions
 history_dir = ${cfg.history_dir}
 
 # --- openai ---

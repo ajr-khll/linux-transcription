@@ -1,4 +1,4 @@
-/* whisprd-menu -- design 4b.
+/* scribe-menu -- design 4b.
  * Palette and metrics are taken verbatim from the handoff spec; treat the
  * hex values and px sizes here as the source of truth for the design. */
 
@@ -13,7 +13,7 @@
  * GTK paints the window background under everything, so a radius set here
  * would be covered by an opaque rectangle. The background, border and radius
  * live on .panel instead, and the corner is real. */
-window.whisprd-menu {
+window.scribe-menu {
   background-color: transparent;
   font-family: "IBM Plex Mono", monospace;
   font-size: 12px;

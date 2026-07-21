@@ -1,16 +1,16 @@
-# whisprd-menu -- design 4b floating panel.
+# scribe-menu -- design 4b floating panel.
 # GJS, so nothing compiles; these targets run, check and install it.
 # (A justfile with the same targets is provided for `just` users.)
 
 PREFIX ?= /usr/local
-SHARE  := $(PREFIX)/share/whisprd-menu
+SHARE  := $(PREFIX)/share/scribe-menu
 
 .PHONY: all run run-windowed check deps install uninstall
 
 all: deps
 
 run:
-	./whisprd-menu
+	./scribe-menu
 
 # Normal window instead of a layer surface -- for X11, or to debug placement.
 run-windowed:
@@ -52,8 +52,8 @@ install:
 	install -m644 app.js style.css $(DESTDIR)$(SHARE)/
 	install -m644 src/*.js $(DESTDIR)$(SHARE)/src/
 	install -d $(DESTDIR)$(PREFIX)/bin
-	sed 's|@SHAREDIR@|$(SHARE)|' whisprd-menu > $(DESTDIR)$(PREFIX)/bin/whisprd-menu
-	chmod 755 $(DESTDIR)$(PREFIX)/bin/whisprd-menu
+	sed 's|@SHAREDIR@|$(SHARE)|' scribe-menu > $(DESTDIR)$(PREFIX)/bin/scribe-menu
+	chmod 755 $(DESTDIR)$(PREFIX)/bin/scribe-menu
 
 uninstall:
-	rm -rf $(DESTDIR)$(SHARE) $(DESTDIR)$(PREFIX)/bin/whisprd-menu
+	rm -rf $(DESTDIR)$(SHARE) $(DESTDIR)$(PREFIX)/bin/scribe-menu

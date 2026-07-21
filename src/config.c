@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 AJ Khullar
  *
- * whisprd -- hold-to-talk voice transcription for Linux.
+ * scribe -- hold-to-talk voice transcription for Linux.
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 3, as published
  * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
@@ -148,9 +148,9 @@ static void default_path(char *out, size_t n)
 {
     const char *xdg = getenv("XDG_CONFIG_HOME");
     if (xdg && *xdg)
-        snprintf(out, n, "%s/whisprd/config.ini", xdg);
+        snprintf(out, n, "%s/scribe/config.ini", xdg);
     else
-        snprintf(out, n, "%s/.config/whisprd/config.ini", getenv("HOME") ? getenv("HOME") : ".");
+        snprintf(out, n, "%s/.config/scribe/config.ini", getenv("HOME") ? getenv("HOME") : ".");
 }
 
 /* The environment wins over the file. Keeping the key out of config.ini is the

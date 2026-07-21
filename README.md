@@ -1,4 +1,4 @@
-# whisprd
+# Scribe
 
 Hold-to-talk voice transcription for Linux. Press and hold a key, speak, release —
 the text lands in whatever window has focus.
@@ -27,7 +27,7 @@ On GNOME/KDE Wayland, auto-detection lands on `uinput`.
 
 ## Install
 
-Get an OpenAI API key first — [platform.openai.com/api-keys][keys]. whisprd will not
+Get an OpenAI API key first — [platform.openai.com/api-keys][keys]. scribe will not
 start without one.
 
 [keys]: https://platform.openai.com/api-keys
@@ -46,9 +46,9 @@ when your session starts, so the service cannot open `/dev/uinput` until then.
 Then:
 
 ```sh
-whisprd --list-sources     # pick a microphone, set `source` in the config
-whisprd --say "hello"      # test injection without speaking
-whisprd-menu               # settings and history panel
+scribe --list-sources     # pick a microphone, set `source` in the config
+scribe --say "hello"      # test injection without speaking
+scribe-menu               # settings and history panel
 ```
 
 `./uninstall.sh` reverses it: stops the service, removes the binaries and the udev
@@ -70,13 +70,13 @@ make && make test
 sudo make install
 
 sudo usermod -aG input $USER            # then log out and back in
-mkdir -p ~/.config/whisprd && chmod 700 ~/.config/whisprd
-cp /usr/local/share/whisprd/config.ini.example ~/.config/whisprd/config.ini
-chmod 600 ~/.config/whisprd/config.ini  # it holds your API key
-$EDITOR ~/.config/whisprd/config.ini    # set api_key
+mkdir -p ~/.config/scribe && chmod 700 ~/.config/scribe
+cp /usr/local/share/scribe/config.ini.example ~/.config/scribe/config.ini
+chmod 600 ~/.config/scribe/config.ini  # it holds your API key
+$EDITOR ~/.config/scribe/config.ini    # set api_key
 
 systemctl --user daemon-reload
-systemctl --user enable --now whisprd
+systemctl --user enable --now scribe
 ```
 
 `make WITH_WLR_VK=0` drops the Wayland backend; `make WITH_MENU=0` drops the panel.
@@ -91,21 +91,21 @@ starts it. Check:
 systemctl --user is-active graphical-session.target
 ```
 
-If it prints `inactive`, either launch your compositor under `uwsm`, or start whisprd
-from the compositor's autostart — `exec-once = systemctl --user start whisprd` on
+If it prints `inactive`, either launch your compositor under `uwsm`, or start scribe
+from the compositor's autostart — `exec-once = systemctl --user start scribe` on
 Hyprland.
 
 ### Permissions
 
-whisprd reads `/dev/input/event*` and writes `/dev/uinput`. **Do not run it as root.**
+scribe reads `/dev/input/event*` and writes `/dev/uinput`. **Do not run it as root.**
 Most distributions ship both as `root:input`, so joining the `input` group is enough.
 Verify with `stat -c '%n %U:%G %a' /dev/uinput /dev/input/event0`; if the group is not
-`input`, install `udev/99-whisprd.rules` — see the comments in that file. (whisprd
+`input`, install `udev/99-scribe.rules` — see the comments in that file. (scribe
 opens `/dev/uinput` write-only, so the common `0620` mode is fine.)
 
 ## Configure
 
-`~/.config/whisprd/config.ini`, mode `0600`. See `config.ini.example`.
+`~/.config/scribe/config.ini`, mode `0600`. See `config.ini.example`.
 
 `api_key` is the only required setting. `OPENAI_API_KEY` in the environment overrides
 it — prefer that if you sync or back up your dotfiles, since a synced `0600` file is
@@ -121,12 +121,12 @@ when it comes up, a low double beep when nothing usable came back. It uses
 
 ## Settings panel
 
-`whisprd-menu` is the settings and transcript-history panel — a GJS + GTK4 app under
+`scribe-menu` is the settings and transcript-history panel — a GJS + GTK4 app under
 `menu/`. It does not link against the daemon: the two share only `config.ini`, a
 `SIGHUP`, and the journal, so the daemon stays headless.
 
 ```sh
-whisprd-menu       # or launch "whisprd" from your application menu
+scribe-menu       # or launch "scribe" from your application menu
 ```
 
 It enters your API key, picks the model, edits the config, and signals the daemon to
@@ -146,21 +146,33 @@ and are edited in `config.ini` directly. See `TODO.md`.
 *not* the microphone you use.
 
 ```sh
-whisprd --list-sources          # samples each device and prints its peak level
+scribe --list-sources          # samples each device and prints its peak level
 ```
 
 If transcripts come back as plausible nonsense — `you`, `Thank you.`, `Subtitles by
-the Amara.org community` — you are recording silence from the wrong source. Whisper
-does not return an empty string for silent audio; it emits caption boilerplate
-memorised from training. whisprd guards against this by refusing any utterance peaking
-below 2% of full scale. A live microphone reads well above that; an unplugged jack
-sits below it.
+the Amara.org community` — you are recording the wrong source. Whisper does not return
+an empty string for audio with no voice in it; it emits caption boilerplate memorised
+from training. scribe refuses two kinds of utterance before spending a request on them:
+
+- **Silent.** Peaks below 2% of full scale. A live microphone reads well above that;
+  an unplugged jack sits below it.
+- **Flat.** Loud enough, but the level barely moves — hiss, a fan, an analog input
+  with nothing plugged into it. Speech swings 24 dB or more between syllable and
+  pause; the noise floors measured here swing 2 to 10. The cut is at 16 dB.
+
+Both rejections log what they measured, so `journalctl --user -u scribe` says which
+test failed and by how much.
+
+The stream is pinned to the source you name, so the audio server cannot quietly move
+scribe to another microphone mid-session. The cost of that: unplugging the configured
+mic stops capture outright rather than migrating it. scribe says so in the log, and
+picks the device up again on `systemctl --user reload scribe`.
 
 ## Run
 
 ```sh
-build/whisprd -v          # verbose
-build/whisprd -p          # print transcripts instead of injecting them
+build/scribe -v          # verbose
+build/scribe -p          # print transcripts instead of injecting them
 ```
 
 `-p` tests capture and inference without the injector.
@@ -209,14 +221,14 @@ Force one with `backend = wlr-vk | uinput | clipboard`.
 
 ## License
 
-whisprd is licensed under the **GNU General Public License, version 3**. See `LICENSE`.
+scribe is licensed under the **GNU General Public License, version 3**. See `LICENSE`.
 Source files carry an `SPDX-License-Identifier: GPL-3.0-only` header.
 
 `protocol/virtual-keyboard-unstable-v1.xml` is vendored, not original. It is MIT
 licensed (Kristian Høgsberg, Intel, Collabora, Purism) and keeps its notice inline; MIT
 is GPL-compatible.
 
-The libraries whisprd links (libevdev, libpulse, libcurl, wayland-client, libxkbcommon)
+The libraries scribe links (libevdev, libpulse, libcurl, wayland-client, libxkbcommon)
 are MIT or LGPL and compatible with GPLv3. One caveat: libcurl built against OpenSSL
 1.x is *not* GPL-compatible; OpenSSL 3.x is Apache-2.0 and fine. A distribution shipping
 libcurl on OpenSSL 1.x would need a linking exception.

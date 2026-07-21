@@ -13,7 +13,7 @@ export function dir() {
     const base = xdg && xdg.length
         ? xdg
         : GLib.build_filenamev([GLib.get_home_dir(), ".local", "share"]);
-    return GLib.build_filenamev([base, "whisprd", "transcriptions"]);
+    return GLib.build_filenamev([base, "scribe", "transcriptions"]);
 }
 
 /* 612w / 3.2kw, matching the design. */
@@ -66,7 +66,7 @@ export function list() {
             "standard::name,standard::size,time::modified",
             Gio.FileQueryInfoFlags.NONE, null);
     } catch (e) {
-        logError(e, "whisprd-menu: cannot read the history directory");
+        logError(e, "scribe-menu: cannot read the history directory");
         return [];
     }
 
@@ -123,7 +123,7 @@ export function open(path) {
             Gio.File.new_for_path(path).get_uri(), null);
         return true;
     } catch (e) {
-        logError(e, "whisprd-menu: cannot open the transcript");
+        logError(e, "scribe-menu: cannot open the transcript");
         return false;
     }
 }
@@ -143,7 +143,7 @@ export function remove(path) {
             f.delete(null);
             return "deleted";
         } catch (e) {
-            logError(e, "whisprd-menu: cannot remove the transcript");
+            logError(e, "scribe-menu: cannot remove the transcript");
             return "failed";
         }
     }

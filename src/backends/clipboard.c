@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 AJ Khullar
  *
- * whisprd -- hold-to-talk voice transcription for Linux.
+ * scribe -- hold-to-talk voice transcription for Linux.
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 3, as published
  * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
@@ -90,7 +90,7 @@ static int run_copy(char *const argv[], const char *text)
     }
     /* Anything else non-zero means the clipboard was not updated. Pasting
      * anyway would inject whatever the user had copied earlier, which reads as
-     * whisprd transcribing the wrong thing rather than as a failure. */
+     * scribe transcribing the wrong thing rather than as a failure. */
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
         log_err("%s failed (exit %d); clipboard not updated\n", argv[0],
                 WIFEXITED(status) ? WEXITSTATUS(status) : -1);

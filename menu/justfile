@@ -1,4 +1,4 @@
-# whisprd-menu -- design 4b floating panel.
+# scribe-menu -- design 4b floating panel.
 # The app is GJS, so there is nothing to compile; these recipes cover
 # running, linting and installing it.
 
@@ -8,7 +8,7 @@ default: run
 
 # Run the panel from this directory.
 run:
-    ./whisprd-menu
+    ./scribe-menu
 
 # Run without layer-shell, as a normal window (useful on X11 or for debugging
 # placement problems).
@@ -45,12 +45,12 @@ deps:
 # The launcher finds app.js beside itself, which stops being true the moment it
 # lands in bin/ -- so point it at the install prefix on the way past.
 install:
-    install -d {{prefix}}/share/whisprd-menu/src
-    install -m644 app.js style.css {{prefix}}/share/whisprd-menu/
-    install -m644 src/*.js {{prefix}}/share/whisprd-menu/src/
+    install -d {{prefix}}/share/scribe-menu/src
+    install -m644 app.js style.css {{prefix}}/share/scribe-menu/
+    install -m644 src/*.js {{prefix}}/share/scribe-menu/src/
     install -d {{prefix}}/bin
-    sed 's|@SHAREDIR@|{{prefix}}/share/whisprd-menu|' whisprd-menu > {{prefix}}/bin/whisprd-menu
-    chmod 755 {{prefix}}/bin/whisprd-menu
+    sed 's|@SHAREDIR@|{{prefix}}/share/scribe-menu|' scribe-menu > {{prefix}}/bin/scribe-menu
+    chmod 755 {{prefix}}/bin/scribe-menu
 
 uninstall:
-    rm -rf {{prefix}}/share/whisprd-menu {{prefix}}/bin/whisprd-menu
+    rm -rf {{prefix}}/share/scribe-menu {{prefix}}/bin/scribe-menu

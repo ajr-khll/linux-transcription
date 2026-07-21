@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 AJ Khullar
  *
- * whisprd -- hold-to-talk voice transcription for Linux.
+ * scribe -- hold-to-talk voice transcription for Linux.
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 3, as published
  * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
@@ -91,7 +91,7 @@ static void add_device(const char *path)
 
     /* Never listen to ourselves: injected keystrokes read back as input would
      * be a feedback loop. */
-    if (name && strcmp(name, WHISPRD_UINPUT_NAME) == 0) {
+    if (name && strcmp(name, SCRIBE_UINPUT_NAME) == 0) {
         log_dbg("skipping own virtual keyboard at %s\n", path);
         goto skip;
     }

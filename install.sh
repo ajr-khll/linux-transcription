@@ -1,5 +1,5 @@
 #!/bin/sh
-# whisprd installer. Run from a checkout:  ./install.sh
+# scribe installer. Run from a checkout:  ./install.sh
 #
 # Deliberately not a curl|bash one-liner. This needs sudo for /usr/local and
 # for the input group, and piping an unread script into a shell that then asks
@@ -7,14 +7,17 @@
 set -eu
 
 PREFIX="${PREFIX:-/usr/local}"
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/whisprd"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/scribe"
 CONFIG="$CONFIG_DIR/config.ini"
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/scribe"
+OLD_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/whisprd"
+OLD_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/whisprd"
 
 say()  { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 warn() { printf '\033[33m    %s\033[0m\n' "$1"; }
 die()  { printf '\033[31merror: %s\033[0m\n' "$1" >&2; exit 1; }
 
-[ -f Makefile ] && [ -d src ] || die "run this from the whisprd source directory"
+[ -f Makefile ] && [ -d src ] || die "run this from the scribe source directory"
 [ "$(id -u)" -ne 0 ] || die "do not run this as root; it will sudo where needed"
 
 # ---- dependencies ----------------------------------------------------------
@@ -53,7 +56,7 @@ say "installing to $PREFIX"
 sudo make install "PREFIX=$PREFIX"
 
 # ---- permissions -----------------------------------------------------------
-# whisprd reads /dev/input/event* and writes /dev/uinput. It must NOT run as
+# scribe reads /dev/input/event* and writes /dev/uinput. It must NOT run as
 # root, so the user joins the input group instead.
 say "permissions"
 if id -nG | tr ' ' '\n' | grep -qx input; then
@@ -67,8 +70,41 @@ fi
 
 if ! stat -c '%G' /dev/uinput 2>/dev/null | grep -qx input; then
     warn "/dev/uinput is not group 'input'; installing the udev rule"
-    sudo cp udev/99-whisprd.rules /etc/udev/rules.d/
+    sudo cp udev/99-scribe.rules /etc/udev/rules.d/
     sudo udevadm control --reload && sudo udevadm trigger
+fi
+
+# ---- migration from whisprd ------------------------------------------------
+# The project was called whisprd before 0.2.0. Move the old config and
+# transcripts across, or an upgrade starts from an empty config and leaves a
+# working API key stranded in a directory nothing reads any more.
+#
+# mv rather than cp: config.ini is 0600 because it holds the key, and mv keeps
+# the mode where cp would apply the umask. Nothing is ever overwritten -- if
+# both exist the new one wins and the old is left alone for you to inspect.
+# This runs before the config section below, so the "no key set" check sees
+# the migrated file rather than a fresh empty one.
+migrate() {
+    _old="$1"
+    _new="$2"
+    [ -e "$_old" ] || return 0
+    if [ -e "$_new" ]; then
+        warn "both $_old and $_new exist; keeping $_new"
+        warn "the old one is untouched -- remove it once you have checked it"
+        return 0
+    fi
+    mkdir -p "$(dirname "$_new")"
+    mv "$_old" "$_new"
+    echo "    moved $_old -> $_new"
+}
+
+if [ -e "$OLD_CONFIG_DIR" ] || [ -e "$OLD_DATA_DIR" ]; then
+    say "migrating from whisprd"
+    migrate "$OLD_CONFIG_DIR" "$CONFIG_DIR"
+    migrate "$OLD_DATA_DIR" "$DATA_DIR"
+    if [ -f "$CONFIG" ]; then
+        chmod 600 "$CONFIG"
+    fi
 fi
 
 # ---- config ----------------------------------------------------------------
@@ -78,7 +114,7 @@ chmod 700 "$CONFIG_DIR"
 if [ -f "$CONFIG" ]; then
     echo "    keeping existing $CONFIG"
 else
-    cp "$PREFIX/share/whisprd/config.ini.example" "$CONFIG"
+    cp "$PREFIX/share/scribe/config.ini.example" "$CONFIG"
     chmod 600 "$CONFIG"
     echo "    wrote $CONFIG"
 fi
@@ -105,9 +141,9 @@ elif [ -t 0 ]; then
         # running ps. awk reads it from ENVIRON and treats it as plain data.
         tmp="$(mktemp)"
         chmod 600 "$tmp"
-        WHISPRD_KEY="$KEY" awk '
+        SCRIBE_KEY="$KEY" awk '
             /^[[:space:]]*api_key[[:space:]]*=/ && !done {
-                print "api_key      = " ENVIRON["WHISPRD_KEY"]; done = 1; next
+                print "api_key      = " ENVIRON["SCRIBE_KEY"]; done = 1; next
             }
             { print }
         ' "$CONFIG" > "$tmp"
@@ -115,10 +151,10 @@ elif [ -t 0 ]; then
         chmod 600 "$CONFIG"
         echo "    key written to $CONFIG (0600)"
     else
-        warn "no key set; whisprd will not start until you add one"
+        warn "no key set; scribe will not start until you add one"
     fi
 else
-    warn "no key set; whisprd will not start until you add one"
+    warn "no key set; scribe will not start until you add one"
 fi
 
 # ---- service ---------------------------------------------------------------
@@ -127,37 +163,37 @@ fi
 # `enable` links the unit and nothing ever starts it.
 say "service"
 systemctl --user daemon-reload
-systemctl --user enable whisprd.service
+systemctl --user enable scribe.service
 
 if systemctl --user is-active --quiet graphical-session.target; then
     if [ "${NEED_LOGOUT:-0}" -eq 0 ]; then
-        systemctl --user restart whisprd.service || \
-            warn "the unit did not start; check: journalctl --user -u whisprd -n 30"
+        systemctl --user restart scribe.service || \
+            warn "the unit did not start; check: journalctl --user -u scribe -n 30"
     fi
 else
     warn "graphical-session.target is not active on this session."
     warn "The unit is enabled but your compositor will never start it."
     warn "Either launch your compositor under uwsm, or add to its autostart:"
-    warn "    systemctl --user start whisprd.service"
+    warn "    systemctl --user start scribe.service"
 fi
 
 # ---- done ------------------------------------------------------------------
 say "installed"
 cat <<EOF
-    whisprd        the daemon (systemd user service)
-    whisprd-menu   settings and history panel
+    scribe        the daemon (systemd user service)
+    scribe-menu   settings and history panel
 
 Next:
-    whisprd --list-sources     pick a microphone, set 'source' in the config
-    whisprd --say "hello"      test injection without speaking
-    whisprd-menu               open the panel
+    scribe --list-sources     pick a microphone, set 'source' in the config
+    scribe --say "hello"      test injection without speaking
+    scribe-menu               open the panel
 
-Bind whisprd-menu to a key in your compositor -- see menu/README.md.
+Bind scribe-menu to a key in your compositor -- see menu/README.md.
 EOF
 
 if [ "${NEED_LOGOUT:-0}" -eq 1 ]; then
     printf '\n\033[33m'
-    echo "You must log out and back in before whisprd can run."
+    echo "You must log out and back in before scribe can run."
     echo "Group membership is read when your session starts, so the service"
     echo "will fail on /dev/uinput until then. A new shell is not enough."
     printf '\033[0m'

@@ -81,7 +81,7 @@ export function sources() {
 
 /* ---- level meter ---------------------------------------------------- */
 
-/* Same rate the daemon captures at, so the meter reflects what whisprd hears
+/* Same rate the daemon captures at, so the meter reflects what scribe hears
  * rather than a resampled approximation of it. */
 const RATE = 16000;
 /* 512 samples, mono s16 -- one chunk every ~32ms, so the meter updates at
@@ -139,7 +139,7 @@ export class Meter {
         } catch (e) {
             /* Once, not every time the device changes. */
             if (!this._warned) {
-                logError(e, "whisprd-menu: cannot run parec; the meter will stay flat");
+                logError(e, "scribe-menu: cannot run parec; the meter will stay flat");
                 this._warned = true;
             }
             this._proc = null;

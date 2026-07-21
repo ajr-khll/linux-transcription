@@ -1,7 +1,7 @@
 #!/usr/bin/env -S gjs -m
-/* whisprd-menu -- design 4b.
+/* scribe-menu -- design 4b.
  *
- * A floating, centred settings + history panel for the whisprd daemon.
+ * A floating, centred settings + history panel for the scribe daemon.
  * Run:  gjs -m app.js       (from this directory)
  *
  * Layer-shell places and sizes the window itself, so unlike a terminal build
@@ -34,7 +34,7 @@ const HERE = GLib.path_get_dirname(import.meta.url.replace("file://", ""));
  * toplevel and the compositor places it (see README for the float rules).
  * `--layer` restores the overlay behaviour for anyone who wants it. */
 const USE_LAYER = System.programArgs.includes("--layer") ||
-                  GLib.getenv("WHISPRD_MENU_LAYER") === "1";
+                  GLib.getenv("SCRIBE_MENU_LAYER") === "1";
 
 let LayerShell = null;
 if (USE_LAYER) {
@@ -365,7 +365,7 @@ function buildLeft() {
 
     const header = box("v", 2, null, [
         box("h", 0, null, [
-            label("whisprd", "host"), label("@linux", "host-domain"),
+            label("scribe", "host"), label("@linux", "host-domain"),
             label("  ·  ", "host-sep"), statusDot, label(" ", null), statusTxt,
             label("  ·  ", "host-sep"), label("pipewire", null),
         ]),
@@ -638,7 +638,7 @@ function startRuntime() {
 /* ---- application ----------------------------------------------------- */
 
 const app = new Gtk.Application({
-    application_id: "dev.whisprd.Menu",
+    application_id: "dev.scribe.Menu",
     flags: Gio.ApplicationFlags.FLAGS_NONE,
 });
 
@@ -650,9 +650,9 @@ app.connect("activate", () => {
 
     win = new Gtk.ApplicationWindow({
         application: app,
-        css_classes: ["whisprd-menu"],
+        css_classes: ["scribe-menu"],
         /* Without this the compositor shows "gjs" in alt-tab and window lists. */
-        title: "whisprd",
+        title: "Scribe",
         default_width: W, default_height: H,
         resizable: false,
         /* The design draws its own 1px border and 8px radius; server-side
@@ -674,7 +674,7 @@ app.connect("activate", () => {
         LayerShell.init_for_window(win);
         LayerShell.set_layer(win, LayerShell.Layer.OVERLAY);
         LayerShell.set_keyboard_mode(win, LayerShell.KeyboardMode.EXCLUSIVE);
-        LayerShell.set_namespace(win, "whisprd-menu");
+        LayerShell.set_namespace(win, "scribe-menu");
         /* No anchors == centred on the output. */
     }
 

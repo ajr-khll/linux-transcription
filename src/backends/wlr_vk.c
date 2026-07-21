@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 AJ Khullar
  *
- * whisprd -- hold-to-talk voice transcription for Linux.
+ * scribe -- hold-to-talk voice transcription for Linux.
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 3, as published
  * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
@@ -172,7 +172,7 @@ static char *build_keymap(const uint32_t *distinct, size_t n)
     } while (0)
 
     APPEND("xkb_keymap {\n"
-           "xkb_keycodes \"(whisprd)\" {\n"
+           "xkb_keycodes \"(scribe)\" {\n"
            "  minimum = 8;\n"
            "  maximum = 255;\n");
 
@@ -180,9 +180,9 @@ static char *build_keymap(const uint32_t *distinct, size_t n)
         APPEND("  <K%zu> = %zu;\n", i, i + 9);
 
     APPEND("};\n"
-           "xkb_types \"(whisprd)\" { include \"complete\" };\n"
-           "xkb_compatibility \"(whisprd)\" { include \"complete\" };\n"
-           "xkb_symbols \"(whisprd)\" {\n");
+           "xkb_types \"(scribe)\" { include \"complete\" };\n"
+           "xkb_compatibility \"(scribe)\" { include \"complete\" };\n"
+           "xkb_symbols \"(scribe)\" {\n");
 
     for (size_t i = 0; i < n; i++) {
         char name[64];
@@ -203,7 +203,7 @@ static int upload_keymap(vk_ctx *c, const uint32_t *distinct, size_t n)
         return -1;
     size_t size = strlen(km) + 1;        /* compositor mmaps including the NUL */
 
-    int fd = memfd_create("whisprd-keymap", MFD_CLOEXEC);
+    int fd = memfd_create("scribe-keymap", MFD_CLOEXEC);
     if (fd < 0) {
         log_err("memfd_create: %s\n", strerror(errno));
         free(km);

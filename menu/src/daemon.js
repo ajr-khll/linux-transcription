@@ -1,4 +1,4 @@
-/* Client side of the existing whisprd daemon.
+/* Client side of the existing scribe daemon.
  *
  * The daemon exposes no socket and no D-Bus interface -- it is a hold-to-talk
  * process that logs to stderr. So "status" is the systemd user unit's state,
@@ -8,7 +8,7 @@
 import GLib from "gi://GLib";
 import Gio from "gi://Gio";
 
-const UNIT = "whisprd.service";
+const UNIT = "scribe.service";
 
 /* ---- status -------------------------------------------------------- */
 
@@ -25,7 +25,7 @@ export function isActive() {
 /* ---- config reload ------------------------------------------------- */
 
 /* The daemon re-reads its config on SIGHUP. Falls back to a unit restart if
- * whisprd is running outside systemd or the signal cannot be delivered. */
+ * scribe is running outside systemd or the signal cannot be delivered. */
 export function reload() {
     try {
         const [, , , status] = GLib.spawn_sync(
@@ -35,7 +35,7 @@ export function reload() {
     } catch (_) { /* fall through */ }
 
     try {
-        GLib.spawn_command_line_sync(`pkill -HUP -x whisprd`);
+        GLib.spawn_command_line_sync(`pkill -HUP -x scribe`);
         return "reloaded";
     } catch (_) {
         return "failed";
@@ -45,8 +45,10 @@ export function reload() {
 /* ---- live transcript feed ------------------------------------------ */
 
 /* Follows the journal for the user unit and emits the text of each
- * "whisprd: transcript: ..." line. That prefix is written by the worker
- * thread in src/main.c; if it ever changes, change it here too. */
+ * "scribe: transcript: ..." line. The match below keys on "transcript:"
+ * alone, not the "scribe: " prefix, so renaming the daemon does not break
+ * the feed -- but the worker thread in src/main.c owns the "transcript:"
+ * marker, and if that changes it has to change here too. */
 export class Feed {
     constructor(onLine) {
         this._onLine = onLine;
@@ -62,7 +64,7 @@ export class Feed {
                  "-o", "cat", "--no-pager"],
                 Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
         } catch (e) {
-            logError(e, "whisprd-menu: cannot follow the journal");
+            logError(e, "scribe-menu: cannot follow the journal");
             return;
         }
         const stream = new Gio.DataInputStream({
