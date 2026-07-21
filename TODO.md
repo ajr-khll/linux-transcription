@@ -25,6 +25,42 @@ header and rebuilding, which is not a fix a user has.
 - The menu should expose them too, though probably as one "how strict" control
   rather than two decibel figures.
 
+## Hallucinated transcripts are only half-fixed
+
+The envelope test in `src/vad.c` removes the common cause: a dead or wrong
+capture source, which Whisper answers with caption boilerplate rather than an
+empty string. That is an input-side guard and it is all we have. Everything
+below is still open.
+
+- **It still happens on real speech.** Short, quiet, clipped or half-spoken
+  audio produces the same boilerplate, and by definition the envelope test
+  passes it -- there is speech in there. The guard cannot see this class at
+  all.
+- **Nothing checks the output.** Every transcript is trusted once it comes
+  back. The daemon has no notion of a suspicious result.
+- **We throw away Whisper's own confidence.** `transcribe.c` asks for
+  `response_format=json`. `verbose_json` returns `no_speech_prob` and
+  `avg_logprob` per segment, and a high `no_speech_prob` alongside fluent text
+  is precisely the hallucination signature. We never see it because we never
+  ask for it. This is the cheapest real improvement available.
+- **`language` is never sent**, so every request auto-detects. On marginal
+  audio it picks a language and then produces confident boilerplate in it.
+  The config already knows the keyboard layout; the spoken language is a
+  reasonable thing to ask for too.
+- **`temperature` is never sent.** The API falls back to higher temperatures
+  on low-confidence decodes, which is exactly when boilerplate appears.
+  Pinning it to 0 trades a little accuracy on hard audio for less invention.
+- **A phrase blocklist** ("Thank you.", "Subtitles by the Amara.org
+  community", a bare "you") is the obvious fix and the fragile one: it is
+  locale-dependent, it rots as models change, and it will eventually eat a
+  real transcript. If it goes in it belongs behind a confidence check, not
+  instead of one.
+- **None of this is measured.** There is no record of how often it still
+  happens or on what. `history = on` keeps transcripts but nothing keeps the
+  audio that produced them, so a bad result cannot be replayed. Some way to
+  retain the PCM behind a suspicious transcript would make the rest of this
+  list tractable instead of guesswork.
+
 ## Settings the menu cannot reach
 
 `scribe-menu` replaced the old GTK4 settings app, and three settings lost
