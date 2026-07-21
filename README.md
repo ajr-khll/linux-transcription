@@ -48,7 +48,7 @@ Then:
 ```sh
 whisprd --list-sources     # pick a microphone, set `source` in the config
 whisprd --say "hello"      # test injection without speaking
-whisprd-menu               # settings and history panel
+scribe-menu               # settings and history panel
 ```
 
 `./uninstall.sh` reverses it: stops the service, removes the binaries and the udev
@@ -121,12 +121,12 @@ when it comes up, a low double beep when nothing usable came back. It uses
 
 ## Settings panel
 
-`whisprd-menu` is the settings and transcript-history panel — a GJS + GTK4 app under
+`scribe-menu` is the settings and transcript-history panel — a GJS + GTK4 app under
 `menu/`. It does not link against the daemon: the two share only `config.ini`, a
 `SIGHUP`, and the journal, so the daemon stays headless.
 
 ```sh
-whisprd-menu       # or launch "whisprd" from your application menu
+scribe-menu       # or launch "whisprd" from your application menu
 ```
 
 It enters your API key, picks the model, edits the config, and signals the daemon to

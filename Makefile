@@ -5,7 +5,7 @@ BUILD       ?= build
 # Backends are opt-out so users only pull in what their session needs.
 WITH_WLR_VK ?= 1
 WITH_UINPUT_LAYOUT ?= 1
-# The settings UI is whisprd-menu (menu/), a separate GJS application. It does
+# The settings UI is scribe-menu (menu/), a separate GJS application. It does
 # not compile and does not link against the daemon -- they share only
 # config.ini, SIGHUP and the journal -- so it installs rather than builds.
 WITH_MENU   ?= 1

@@ -1,4 +1,4 @@
-# whisprd-menu
+# scribe-menu
 
 Floating settings + history panel for the whisprd daemon — design `4b`, built
 on GJS + GTK4.
@@ -55,21 +55,21 @@ control moves the window.
 windowrulev2 = float,        class:^(dev\.whisprd\.Menu)$
 windowrulev2 = size 940 566, class:^(dev\.whisprd\.Menu)$
 windowrulev2 = center,       class:^(dev\.whisprd\.Menu)$
-bind = SUPER, W, exec, /usr/local/bin/whisprd-menu
+bind = SUPER, W, exec, /usr/local/bin/scribe-menu
 ```
 
 ### Sway
 
 ```
 for_window [app_id="dev.whisprd.Menu"] floating enable, resize set 940 566, move position center
-bindsym $mod+w exec /usr/local/bin/whisprd-menu
+bindsym $mod+w exec /usr/local/bin/scribe-menu
 ```
 
 ### i3 (X11)
 
 ```
 for_window [class="dev.whisprd.Menu"] floating enable, resize set 940 566, move position center
-bindsym $mod+w exec /usr/local/bin/whisprd-menu
+bindsym $mod+w exec /usr/local/bin/scribe-menu
 ```
 
 Hyprland already floats it without a rule, since it is fixed-size — the rules
@@ -80,12 +80,12 @@ while the panel is already open focuses it rather than starting a second copy.
 
 ### Overlay mode
 
-`whisprd-menu --layer` (or `SCRIBE_MENU_LAYER=1`) makes it a layer-shell
+`scribe-menu --layer` (or `SCRIBE_MENU_LAYER=1`) makes it a layer-shell
 surface instead: always centred with no window rules, drawn above everything.
 The trade is that a layer surface is not a window — the compositor gives it no
 move, no ordinary focus and no alt-tab, which is why it is not the default.
 
-The `whisprd-menu` shell script sets `LD_PRELOAD` for gtk4-layer-shell, which
+The `scribe-menu` shell script sets `LD_PRELOAD` for gtk4-layer-shell, which
 must load before `libwayland-client`; under GJS the linker cannot arrange that
 on its own. It is only needed for `--layer`.
 
@@ -230,7 +230,7 @@ uinput device, fresh config. `SIGINT`/`SIGTERM` still exit.
 
 `make install` from the top level installs the daemon and this panel together;
 `make WITH_MENU=0` leaves the panel out. Either way the launcher is rewritten on
-the way past to point at `$(PREFIX)/share/whisprd-menu`, since `app.js` no
+the way past to point at `$(PREFIX)/share/scribe-menu`, since `app.js` no
 longer sits beside it once it lands in `bin/`. `SCRIBE_MENU_DIR` overrides it.
 
 ## Replaces `whisprd-gui`

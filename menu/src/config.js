@@ -91,7 +91,7 @@ export function save(cfg) {
     GLib.mkdir_with_parents(dir, 0o700);
 
     const out =
-`# whisprd configuration -- written by whisprd-menu
+`# whisprd configuration -- written by scribe-menu
 
 # --- hotkey ---
 # evdev key name to hold. Single key or "MOD+KEY".

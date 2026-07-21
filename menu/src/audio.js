@@ -139,7 +139,7 @@ export class Meter {
         } catch (e) {
             /* Once, not every time the device changes. */
             if (!this._warned) {
-                logError(e, "whisprd-menu: cannot run parec; the meter will stay flat");
+                logError(e, "scribe-menu: cannot run parec; the meter will stay flat");
                 this._warned = true;
             }
             this._proc = null;

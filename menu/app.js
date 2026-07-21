@@ -1,5 +1,5 @@
 #!/usr/bin/env -S gjs -m
-/* whisprd-menu -- design 4b.
+/* scribe-menu -- design 4b.
  *
  * A floating, centred settings + history panel for the whisprd daemon.
  * Run:  gjs -m app.js       (from this directory)
@@ -650,7 +650,7 @@ app.connect("activate", () => {
 
     win = new Gtk.ApplicationWindow({
         application: app,
-        css_classes: ["whisprd-menu"],
+        css_classes: ["scribe-menu"],
         /* Without this the compositor shows "gjs" in alt-tab and window lists. */
         title: "whisprd",
         default_width: W, default_height: H,
@@ -674,7 +674,7 @@ app.connect("activate", () => {
         LayerShell.init_for_window(win);
         LayerShell.set_layer(win, LayerShell.Layer.OVERLAY);
         LayerShell.set_keyboard_mode(win, LayerShell.KeyboardMode.EXCLUSIVE);
-        LayerShell.set_namespace(win, "whisprd-menu");
+        LayerShell.set_namespace(win, "scribe-menu");
         /* No anchors == centred on the output. */
     }
 

@@ -145,14 +145,14 @@ fi
 say "installed"
 cat <<EOF
     whisprd        the daemon (systemd user service)
-    whisprd-menu   settings and history panel
+    scribe-menu   settings and history panel
 
 Next:
     whisprd --list-sources     pick a microphone, set 'source' in the config
     whisprd --say "hello"      test injection without speaking
-    whisprd-menu               open the panel
+    scribe-menu               open the panel
 
-Bind whisprd-menu to a key in your compositor -- see menu/README.md.
+Bind scribe-menu to a key in your compositor -- see menu/README.md.
 EOF
 
 if [ "${NEED_LOGOUT:-0}" -eq 1 ]; then

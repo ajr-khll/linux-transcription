@@ -62,7 +62,7 @@ export class Feed {
                  "-o", "cat", "--no-pager"],
                 Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
         } catch (e) {
-            logError(e, "whisprd-menu: cannot follow the journal");
+            logError(e, "scribe-menu: cannot follow the journal");
             return;
         }
         const stream = new Gio.DataInputStream({
