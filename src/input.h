@@ -7,8 +7,8 @@
  * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
  * see the LICENSE file or <https://www.gnu.org/licenses/> for details.
  */
-#ifndef WHISPRD_INPUT_H
-#define WHISPRD_INPUT_H
+#ifndef SCRIBE_INPUT_H
+#define SCRIBE_INPUT_H
 
 #include <stdbool.h>
 

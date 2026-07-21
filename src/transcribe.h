@@ -7,8 +7,8 @@
  * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
  * see the LICENSE file or <https://www.gnu.org/licenses/> for details.
  */
-#ifndef WHISPRD_TRANSCRIBE_H
-#define WHISPRD_TRANSCRIBE_H
+#ifndef SCRIBE_TRANSCRIBE_H
+#define SCRIBE_TRANSCRIBE_H
 
 #include <stddef.h>
 #include <stdint.h>

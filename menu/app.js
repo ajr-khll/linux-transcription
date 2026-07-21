@@ -34,7 +34,7 @@ const HERE = GLib.path_get_dirname(import.meta.url.replace("file://", ""));
  * toplevel and the compositor places it (see README for the float rules).
  * `--layer` restores the overlay behaviour for anyone who wants it. */
 const USE_LAYER = System.programArgs.includes("--layer") ||
-                  GLib.getenv("WHISPRD_MENU_LAYER") === "1";
+                  GLib.getenv("SCRIBE_MENU_LAYER") === "1";
 
 let LayerShell = null;
 if (USE_LAYER) {

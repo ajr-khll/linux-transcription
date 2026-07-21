@@ -7,8 +7,8 @@
  * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
  * see the LICENSE file or <https://www.gnu.org/licenses/> for details.
  */
-#ifndef WHISPRD_INJECTOR_H
-#define WHISPRD_INJECTOR_H
+#ifndef SCRIBE_INJECTOR_H
+#define SCRIBE_INJECTOR_H
 
 #include <stdbool.h>
 

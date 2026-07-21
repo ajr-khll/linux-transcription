@@ -7,8 +7,8 @@
  * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
  * see the LICENSE file or <https://www.gnu.org/licenses/> for details.
  */
-#ifndef WHISPRD_QUEUE_H
-#define WHISPRD_QUEUE_H
+#ifndef SCRIBE_QUEUE_H
+#define SCRIBE_QUEUE_H
 
 #include <stddef.h>
 #include <stdint.h>

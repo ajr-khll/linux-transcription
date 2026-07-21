@@ -91,7 +91,7 @@ static void add_device(const char *path)
 
     /* Never listen to ourselves: injected keystrokes read back as input would
      * be a feedback loop. */
-    if (name && strcmp(name, WHISPRD_UINPUT_NAME) == 0) {
+    if (name && strcmp(name, SCRIBE_UINPUT_NAME) == 0) {
         log_dbg("skipping own virtual keyboard at %s\n", path);
         goto skip;
     }

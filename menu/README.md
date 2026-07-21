@@ -80,7 +80,7 @@ while the panel is already open focuses it rather than starting a second copy.
 
 ### Overlay mode
 
-`whisprd-menu --layer` (or `WHISPRD_MENU_LAYER=1`) makes it a layer-shell
+`whisprd-menu --layer` (or `SCRIBE_MENU_LAYER=1`) makes it a layer-shell
 surface instead: always centred with no window rules, drawn above everything.
 The trade is that a layer surface is not a window — the compositor gives it no
 move, no ordinary focus and no alt-tab, which is why it is not the default.
@@ -231,7 +231,7 @@ uinput device, fresh config. `SIGINT`/`SIGTERM` still exit.
 `make install` from the top level installs the daemon and this panel together;
 `make WITH_MENU=0` leaves the panel out. Either way the launcher is rewritten on
 the way past to point at `$(PREFIX)/share/whisprd-menu`, since `app.js` no
-longer sits beside it once it lands in `bin/`. `WHISPRD_MENU_DIR` overrides it.
+longer sits beside it once it lands in `bin/`. `SCRIBE_MENU_DIR` overrides it.
 
 ## Replaces `whisprd-gui`
 

@@ -55,7 +55,7 @@ int uinput_kbd_open(void)
     struct uinput_setup setup = {
         .id = { .bustype = BUS_VIRTUAL, .vendor = 0x1209, .product = 0x0001, .version = 1 },
     };
-    snprintf(setup.name, sizeof(setup.name), "%s", WHISPRD_UINPUT_NAME);
+    snprintf(setup.name, sizeof(setup.name), "%s", SCRIBE_UINPUT_NAME);
 
     if (ioctl(fd, UI_DEV_SETUP, &setup) < 0 || ioctl(fd, UI_DEV_CREATE) < 0)
         goto fail;
@@ -64,7 +64,7 @@ int uinput_kbd_open(void)
      * first chord after startup is silently dropped. Paid once, at init. */
     nanosleep(&(struct timespec){ .tv_nsec = 250L * 1000 * 1000 }, NULL);
 
-    log_dbg("uinput keyboard '%s' created\n", WHISPRD_UINPUT_NAME);
+    log_dbg("uinput keyboard '%s' created\n", SCRIBE_UINPUT_NAME);
     return 0;
 
 fail:

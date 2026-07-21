@@ -7,14 +7,14 @@
  * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
  * see the LICENSE file or <https://www.gnu.org/licenses/> for details.
  */
-#ifndef WHISPRD_UINPUT_KBD_H
-#define WHISPRD_UINPUT_KBD_H
+#ifndef SCRIBE_UINPUT_KBD_H
+#define SCRIBE_UINPUT_KBD_H
 
 #include <stddef.h>
 
 /* The input thread skips any device with this name, which is what keeps our
  * own injected keystrokes from being read back as hotkey events. */
-#define WHISPRD_UINPUT_NAME "whisprd-virtual-keyboard"
+#define SCRIBE_UINPUT_NAME "whisprd-virtual-keyboard"
 
 int  uinput_kbd_open(void);
 

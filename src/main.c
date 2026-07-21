@@ -137,7 +137,7 @@ int main(int argc, char **argv)
         case 'v': log_verbose = 1; break;
         case 's': say_text = optarg; break;
         case 'L': list_sources = true; break;
-        case 'V': printf("whisprd %s\n", WHISPRD_VERSION); return 0;
+        case 'V': printf("whisprd %s\n", SCRIBE_VERSION); return 0;
         default:  usage(); return opt == 'h' ? 0 : 2;
         }
     }

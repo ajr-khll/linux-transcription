@@ -7,8 +7,8 @@
  * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
  * see the LICENSE file or <https://www.gnu.org/licenses/> for details.
  */
-#ifndef WHISPRD_CUE_H
-#define WHISPRD_CUE_H
+#ifndef SCRIBE_CUE_H
+#define SCRIBE_CUE_H
 
 #include "config.h"
 

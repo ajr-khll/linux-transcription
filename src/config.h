@@ -7,8 +7,8 @@
  * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
  * see the LICENSE file or <https://www.gnu.org/licenses/> for details.
  */
-#ifndef WHISPRD_CONFIG_H
-#define WHISPRD_CONFIG_H
+#ifndef SCRIBE_CONFIG_H
+#define SCRIBE_CONFIG_H
 
 #include <stdbool.h>
 #include <stddef.h>

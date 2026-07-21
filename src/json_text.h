@@ -7,8 +7,8 @@
  * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
  * see the LICENSE file or <https://www.gnu.org/licenses/> for details.
  */
-#ifndef WHISPRD_JSON_TEXT_H
-#define WHISPRD_JSON_TEXT_H
+#ifndef SCRIBE_JSON_TEXT_H
+#define SCRIBE_JSON_TEXT_H
 
 /* Purpose-built extractor for the one field we care about in an
  * OpenAI-compatible transcription response: {"text": "..."}.

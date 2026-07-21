@@ -7,8 +7,8 @@
  * by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY;
  * see the LICENSE file or <https://www.gnu.org/licenses/> for details.
  */
-#ifndef WHISPRD_HISTORY_H
-#define WHISPRD_HISTORY_H
+#ifndef SCRIBE_HISTORY_H
+#define SCRIBE_HISTORY_H
 
 #include "config.h"
 

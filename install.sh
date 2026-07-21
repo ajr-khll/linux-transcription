@@ -105,9 +105,9 @@ elif [ -t 0 ]; then
         # running ps. awk reads it from ENVIRON and treats it as plain data.
         tmp="$(mktemp)"
         chmod 600 "$tmp"
-        WHISPRD_KEY="$KEY" awk '
+        SCRIBE_KEY="$KEY" awk '
             /^[[:space:]]*api_key[[:space:]]*=/ && !done {
-                print "api_key      = " ENVIRON["WHISPRD_KEY"]; done = 1; next
+                print "api_key      = " ENVIRON["SCRIBE_KEY"]; done = 1; next
             }
             { print }
         ' "$CONFIG" > "$tmp"
