@@ -45,8 +45,10 @@ export function reload() {
 /* ---- live transcript feed ------------------------------------------ */
 
 /* Follows the journal for the user unit and emits the text of each
- * "scribe: transcript: ..." line. That prefix is written by the worker
- * thread in src/main.c; if it ever changes, change it here too. */
+ * "scribe: transcript: ..." line. The match below keys on "transcript:"
+ * alone, not the "scribe: " prefix, so renaming the daemon does not break
+ * the feed -- but the worker thread in src/main.c owns the "transcript:"
+ * marker, and if that changes it has to change here too. */
 export class Feed {
     constructor(onLine) {
         this._onLine = onLine;

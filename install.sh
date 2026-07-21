@@ -9,6 +9,9 @@ set -eu
 PREFIX="${PREFIX:-/usr/local}"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/scribe"
 CONFIG="$CONFIG_DIR/config.ini"
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/scribe"
+OLD_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/whisprd"
+OLD_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/whisprd"
 
 say()  { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 warn() { printf '\033[33m    %s\033[0m\n' "$1"; }
@@ -69,6 +72,39 @@ if ! stat -c '%G' /dev/uinput 2>/dev/null | grep -qx input; then
     warn "/dev/uinput is not group 'input'; installing the udev rule"
     sudo cp udev/99-scribe.rules /etc/udev/rules.d/
     sudo udevadm control --reload && sudo udevadm trigger
+fi
+
+# ---- migration from whisprd ------------------------------------------------
+# The project was called whisprd before 0.2.0. Move the old config and
+# transcripts across, or an upgrade starts from an empty config and leaves a
+# working API key stranded in a directory nothing reads any more.
+#
+# mv rather than cp: config.ini is 0600 because it holds the key, and mv keeps
+# the mode where cp would apply the umask. Nothing is ever overwritten -- if
+# both exist the new one wins and the old is left alone for you to inspect.
+# This runs before the config section below, so the "no key set" check sees
+# the migrated file rather than a fresh empty one.
+migrate() {
+    _old="$1"
+    _new="$2"
+    [ -e "$_old" ] || return 0
+    if [ -e "$_new" ]; then
+        warn "both $_old and $_new exist; keeping $_new"
+        warn "the old one is untouched -- remove it once you have checked it"
+        return 0
+    fi
+    mkdir -p "$(dirname "$_new")"
+    mv "$_old" "$_new"
+    echo "    moved $_old -> $_new"
+}
+
+if [ -e "$OLD_CONFIG_DIR" ] || [ -e "$OLD_DATA_DIR" ]; then
+    say "migrating from whisprd"
+    migrate "$OLD_CONFIG_DIR" "$CONFIG_DIR"
+    migrate "$OLD_DATA_DIR" "$DATA_DIR"
+    if [ -f "$CONFIG" ]; then
+        chmod 600 "$CONFIG"
+    fi
 fi
 
 # ---- config ----------------------------------------------------------------
