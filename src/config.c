@@ -168,6 +168,8 @@ int config_load(config *cfg, const char *path)
 {
     memset(cfg, 0, sizeof(*cfg));
     cfg->hotkey_code = KEY_RIGHTCTRL;
+    /* Existing installs have no engine line and must keep working untouched. */
+    snprintf(cfg->engine, sizeof(cfg->engine), "openai");
     snprintf(cfg->endpoint_url, sizeof(cfg->endpoint_url), "https://api.openai.com/v1");
     snprintf(cfg->model, sizeof(cfg->model), "whisper-1");
     snprintf(cfg->backend, sizeof(cfg->backend), "auto");
@@ -219,6 +221,12 @@ int config_load(config *cfg, const char *path)
         } else if (strcmp(key, "paste_chord") == 0) {
             if (parse_chord(val, &cfg->paste_key, cfg->paste_mods, &cfg->n_paste_mods) < 0)
                 rc = -1;
+        } else if (strcmp(key, "engine") == 0) {
+            snprintf(cfg->engine, sizeof(cfg->engine), "%s", val);
+        } else if (strcmp(key, "model_dir") == 0) {
+            snprintf(cfg->model_dir, sizeof(cfg->model_dir), "%s", val);
+        } else if (strcmp(key, "threads") == 0) {
+            cfg->threads = atoi(val);
         } else if (strcmp(key, "endpoint_url") == 0) {
             snprintf(cfg->endpoint_url, sizeof(cfg->endpoint_url), "%s", val);
         } else if (strcmp(key, "model") == 0) {

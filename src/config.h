@@ -20,7 +20,13 @@ typedef struct {
     int    mod_codes[CFG_MAX_MODS];     /* modifiers that must also be down */
     size_t n_mods;
 
-    char endpoint_url[512];             /* cloud vs local is JUST this */
+    /* Which transcriber runs. The local one has no URL at all, so there is
+     * nothing in endpoint_url to judge it by -- hence a key of its own. */
+    char engine[32];                    /* openai | parakeet */
+    char model_dir[512];                /* parakeet: empty = installed default */
+    int  threads;                       /* parakeet: decode threads; 0 = default */
+
+    char endpoint_url[512];             /* openai: server to POST to */
     char model[128];
     char api_key[256];                  /* empty for a local server */
 
