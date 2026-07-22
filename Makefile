@@ -19,7 +19,8 @@ CFLAGS      += -std=c11 -Wall -Wextra -Wno-unused-parameter -D_GNU_SOURCE -I$(BU
 CFLAGS      += -MMD -MP -DSCRIBE_VERSION='"$(VERSION)"'
 LDLIBS      += -lpthread -lm
 
-SRC := src/main.c src/config.c src/input.c src/audio.c src/transcribe.c \
+SRC := src/main.c src/config.c src/input.c src/audio.c \
+       src/transcribe.c src/asr_openai.c \
        src/json_text.c src/queue.c src/uinput_kbd.c src/injector.c \
        src/history.c src/cue.c src/vad.c src/backends/clipboard.c
 
