@@ -9,6 +9,12 @@ WITH_UINPUT_LAYOUT ?= 1
 # not compile and does not link against the daemon -- they share only
 # config.ini, SIGHUP and the journal -- so it installs rather than builds.
 WITH_MENU   ?= 1
+# The local engine is opt-in the other way round: it needs ~490 MB downloaded
+# by install-parakeet.sh, so a plain `make` must keep working without it.
+WITH_PARAKEET ?= 0
+SHERPA_PREFIX ?= $(PREFIX)/lib/scribe
+SHERPA_INCLUDE ?= third_party/sherpa-onnx/include
+PARAKEET_MODEL_DIR ?= $(PREFIX)/share/scribe/models/parakeet-tdt-0.6b-v3-int8
 
 PKGS        := libevdev libpulse libpulse-simple libcurl
 CFLAGS      ?= -O2 -g
@@ -41,13 +47,26 @@ ifeq ($(WITH_WLR_VK),1)
   GEN    := $(PROTO_C)
 endif
 
+ifeq ($(WITH_PARAKEET),1)
+  CFLAGS += -DWITH_PARAKEET -I$(SHERPA_INCLUDE) \
+            -DSCRIBE_MODEL_DIR='"$(PARAKEET_MODEL_DIR)"'
+  SRC    += src/asr_parakeet.c
+  # sherpa-onnx is not packaged by any distribution and has no .pc file, so
+  # there is nothing for pkg-config to find. rpath rather than ldconfig: the
+  # library is ours, it lives under our own prefix, and a global search path
+  # entry is not ours to add. libsherpa-onnx-c-api.so carries RPATH=$$ORIGIN,
+  # so it finds libonnxruntime.so beside it without further help.
+  LDLIBS += -L$(SHERPA_PREFIX) -lsherpa-onnx-c-api \
+            -Wl,-rpath,$(PREFIX)/lib/scribe
+endif
+
 PKGS := $(sort $(PKGS))
 CFLAGS += $(shell pkg-config --cflags $(PKGS))
 LDLIBS += $(shell pkg-config --libs $(PKGS))
 
 OBJ := $(patsubst %.c,$(BUILD)/%.o,$(SRC)) $(patsubst $(BUILD)/%.c,$(BUILD)/%.o,$(GEN))
 
-.PHONY: all clean install uninstall test
+.PHONY: all clean install uninstall test test-parakeet
 
 all: $(BUILD)/scribe
 
@@ -69,6 +88,18 @@ test: $(PROTO_H) $(PROTO_C)
 	@echo "--- keymap ---" && $(BUILD)/test_keymap
 	@echo "--- layout ---" && $(BUILD)/test_layout
 	@echo "--- vad ---"    && $(BUILD)/test_vad
+
+# Separate from `test` on purpose: it needs a 640 MB model and a library that
+# a plain checkout does not have. Pass a WAV to run it -- install-parakeet.sh
+# keeps one beside the model as test.wav.
+test-parakeet:
+	@mkdir -p $(BUILD)
+	$(CC) $(TEST_CFLAGS) -DWITH_PARAKEET -I$(SHERPA_INCLUDE) \
+	    -DSCRIBE_MODEL_DIR='"$(PARAKEET_MODEL_DIR)"' \
+	    tests/test_parakeet.c src/asr_parakeet.c src/config.c \
+	    -L$(SHERPA_PREFIX) -lsherpa-onnx-c-api -Wl,-rpath,$(PREFIX)/lib/scribe \
+	    $(shell pkg-config --libs libevdev) -o $(BUILD)/test_parakeet
+	@echo "run: $(BUILD)/test_parakeet $(PARAKEET_MODEL_DIR)/test.wav"
 
 $(BUILD)/scribe: $(OBJ)
 	$(CC) $(OBJ) $(LDFLAGS) $(LDLIBS) -o $@

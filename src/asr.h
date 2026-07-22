@@ -28,6 +28,12 @@ void  asr_openai_shutdown(void);
 int   asr_parakeet_init(const config *cfg);
 char *asr_parakeet_pcm(const int16_t *samples, size_t n_samples);
 void  asr_parakeet_shutdown(void);
+
+/* Same, for samples that are not at AUDIO_RATE -- sherpa-onnx resamples
+ * internally. The daemon never needs this, since capture is pinned to
+ * AUDIO_RATE, but the smoke test decodes whatever WAV it is handed and the
+ * model ships samples at 22 and 24 kHz. */
+char *asr_parakeet_pcm_at(const int16_t *samples, size_t n_samples, int rate);
 #endif
 
 #endif
