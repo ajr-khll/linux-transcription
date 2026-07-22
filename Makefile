@@ -25,6 +25,14 @@ SHERPA_PREFIX ?= $(PREFIX)/lib/scribe
 SHERPA_INCLUDE ?= third_party/sherpa-onnx/include
 PARAKEET_MODEL_DIR ?= $(PREFIX)/share/scribe/models/parakeet-tdt-0.6b-v3-int8
 
+# `clean` and `uninstall` compile nothing, so nothing under $(BUILD) should be
+# written for them -- and `./uninstall.sh` runs `sudo make uninstall`. On a tree
+# that was never built that would create build/ owned by root, and the next
+# unprivileged make could not write there. An empty goal list means the default
+# goal, which does build.
+BUILDLESS_GOALS := clean uninstall
+BUILDING := $(if $(MAKECMDGOALS),$(filter-out $(BUILDLESS_GOALS),$(MAKECMDGOALS)),all)
+
 # Written only when the choices actually change. Rewriting it every time would
 # hand the file to root the first time anyone runs `sudo make install`, and the
 # next unprivileged make could not update it.
@@ -34,9 +42,11 @@ WITH_UINPUT_LAYOUT := $(WITH_UINPUT_LAYOUT)
 WITH_MENU := $(WITH_MENU)
 WITH_PARAKEET := $(WITH_PARAKEET)
 endef
+ifneq ($(BUILDING),)
 ifneq ($(CONFIG_MK_TEXT),$(if $(wildcard $(BUILD)/config.mk),$(file < $(BUILD)/config.mk)))
   $(shell mkdir -p $(BUILD))
   $(file > $(BUILD)/config.mk,$(CONFIG_MK_TEXT))
+endif
 endif
 
 PKGS        := libevdev libpulse libpulse-simple libcurl
@@ -102,9 +112,11 @@ OBJ := $(patsubst %.c,$(BUILD)/%.o,$(SRC)) $(patsubst $(BUILD)/%.c,$(BUILD)/%.o,
 BUILD_FLAGS := $(CFLAGS) $(LDLIBS)
 FLAGS_STAMP := $(BUILD)/.build-flags
 PREV_FLAGS  := $(if $(wildcard $(FLAGS_STAMP)),$(file < $(FLAGS_STAMP)))
+ifneq ($(BUILDING),)
 ifneq ($(BUILD_FLAGS),$(PREV_FLAGS))
   $(shell mkdir -p $(BUILD))
   $(file > $(FLAGS_STAMP),$(BUILD_FLAGS))
+endif
 endif
 
 .PHONY: all clean install uninstall test test-parakeet

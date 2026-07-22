@@ -12,9 +12,11 @@ in the config:
 - **`openai`** — a multipart POST to OpenAI's `/audio/transcriptions`. You supply
   an API key, and **everything you dictate is uploaded.**
 
-`openai` is the default, because it is what existing installs already run and it is
-the only option for the ~74 languages Parakeet does not cover. Pick the local engine
-during `./install.sh`, or see [Local transcription](#local-transcription) below.
+`./install.sh` offers the local engine first and takes it if you just press return.
+`config.ini.example` ships `engine = openai` instead, because a plain `make` has no
+local engine compiled in — so that is the right default for a hand-built install and
+for every install that predates Parakeet. Reach for `openai` when you need one of the
+~74 languages Parakeet does not cover.
 
 ## Status
 
@@ -39,39 +41,66 @@ cd linux-transcription
 ./install.sh
 ```
 
-The script asks which engine you want first, since the local one is a compile flag
-rather than a runtime switch. Then it installs dependencies (dnf/apt/pacman), builds,
-installs to `/usr/local`, adds you to the `input` group, seeds the config, and enables
-the systemd user service. Pick cloud and it asks for your API key
-([platform.openai.com/api-keys][keys]); pick local and it never mentions one.
-**Log out and back in afterwards** — group membership is read when your session
-starts, so the service cannot open `/dev/uinput` until then.
+Every question comes first — which engine, your API key if you picked cloud — then it
+prints what it is about to do, takes your password once, and runs unattended:
+dependencies (dnf/apt/pacman), build, install to `/usr/local`, the `input` group, your
+config, the systemd user service. At the end it lists your capture devices with live
+levels so you can pick a microphone, which is the one setting a fresh install most
+often gets wrong. **Log out and back in afterwards** — group membership is read when
+your session starts, so the service cannot open `/dev/uinput` until then.
 
-[keys]: https://platform.openai.com/api-keys
+Answers already in your config are kept, so re-running it is safe.
+
+Every question can be answered on the command line instead — `./install.sh --help`:
+
+```sh
+./install.sh --engine=local                      # no questions worth asking
+./install.sh --engine=cloud --api-key=sk-...     # or set OPENAI_API_KEY
+./install.sh -y                                  # defaults, ask nothing
+./install.sh --skip-deps                         # deps already handled
+```
+
+`OPENAI_API_KEY` in the environment is used but never copied into the config file.
+
+`--prefix` takes `/usr/local` (the default) or `/usr`, and refuses anything else.
+systemd looks for user units in a fixed set of directories, so a unit installed to
+`/opt/scribe/lib/systemd/user` or `~/.local/lib/systemd/user` is never found — the
+install would report success and the service would then not exist. To put scribe
+somewhere else, follow [By hand](#by-hand) and start it yourself.
 
 Then:
 
 ```sh
-scribe --list-sources     # pick a microphone, set `source` in the config
+scribe --list-sources     # change microphone; sets `source` in the config
 scribe --say "hello"      # test injection without speaking
 scribe-menu               # settings and history panel
 ```
 
+[keys]: https://platform.openai.com/api-keys
+
 `./uninstall.sh` reverses it: stops the service, removes the binaries, the udev rule
-and any downloaded model, and leaves your config in place. It names the model
-directory and its size before deleting it.
+and any downloaded model — naming the model directory and its size first, since that
+is most of a gigabyte going without being asked about. Your own data is asked about,
+in two separate questions: the config (which holds your API key), and the transcripts
+under `~/.local/share/scribe/transcriptions`, with a file count and size. Both default
+to keeping. It does not remove you from the `input` group, and says so.
 
 ### By hand
 
 ```sh
 # Fedora
-sudo dnf install libevdev-devel pulseaudio-libs-devel libcurl-devel \
+sudo dnf install gcc make pkgconf-pkg-config curl bzip2 \
+                 libevdev-devel pulseaudio-libs-devel libcurl-devel \
                  libxkbcommon-devel wayland-devel wayland-protocols-devel \
                  gjs gtk4 pulseaudio-utils ibm-plex-mono-fonts
 # Debian/Ubuntu
-sudo apt install libevdev-dev libpulse-dev libcurl4-openssl-dev \
+sudo apt install build-essential pkg-config curl bzip2 \
+                 libevdev-dev libpulse-dev libcurl4-openssl-dev \
                  libxkbcommon-dev libwayland-dev wayland-protocols \
-                 gjs libgtk-4-1 pulseaudio-utils fonts-ibm-plex
+                 gjs libgtk-4-1 gir1.2-gtk-4.0 pulseaudio-utils fonts-ibm-plex
+# Arch
+sudo pacman -S --needed base-devel libevdev libpulse curl bzip2 libxkbcommon \
+                        wayland wayland-protocols gjs gtk4 ttf-ibm-plex
 
 make && make test
 sudo make install
@@ -85,6 +114,12 @@ $EDITOR ~/.config/scribe/config.ini    # set api_key
 systemctl --user daemon-reload
 systemctl --user enable --now scribe
 ```
+
+Two of those are easy to miss. On Debian, `gir1.2-gtk-4.0` is a separate package from
+`libgtk-4-1`, and `scribe-menu` reaches GTK through GObject introspection — without the
+typelib the panel dies on its first import while the daemon looks perfectly healthy.
+`curl` and `bzip2` are for `install-parakeet.sh`; GNU `tar` execs `bzip2` rather than
+decompressing `.tar.bz2` itself, so a missing one fails *after* the 490 MB download.
 
 `make WITH_WLR_VK=0` drops the Wayland backend; `make WITH_MENU=0` drops the panel;
 `make WITH_PARAKEET=1` adds the local engine (see below).

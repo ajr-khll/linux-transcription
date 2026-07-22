@@ -35,6 +35,9 @@ die()  { printf '\033[31merror: %s\033[0m\n' "$1" >&2; exit 1; }
 [ "$(id -u)" -ne 0 ] || die "do not run this as root; it will sudo where needed"
 command -v curl >/dev/null || die "curl is required"
 command -v tar  >/dev/null || die "tar is required"
+# GNU tar does not decompress bzip2 itself; it execs the bzip2 binary. Without
+# it `tar xjf` fails halfway through, after the 490 MB has been downloaded.
+command -v bzip2 >/dev/null || die "bzip2 is required (tar shells out to it)"
 
 case "$(uname -m)" in
     x86_64)  SHERPA_ARCHIVE="sherpa-onnx-$SHERPA_VERSION-linux-x64-shared-no-tts" ;;
