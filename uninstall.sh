@@ -25,6 +25,16 @@ systemctl --user daemon-reload
 
 # ---- installed files -------------------------------------------------------
 say "removing installed files"
+# The model and the sherpa-onnx runtime go with everything else. That is the
+# right outcome -- they are ours and nothing else uses them -- but deleting
+# most of a gigabyte without a word is not, so name it first.
+MODELS="$PREFIX/share/scribe/models"
+if [ -d "$MODELS" ]; then
+    warn "also removing $MODELS ($(du -sh "$MODELS" 2>/dev/null | cut -f1) of local models)"
+fi
+if [ -d "$PREFIX/lib/scribe" ]; then
+    warn "also removing $PREFIX/lib/scribe (the sherpa-onnx runtime)"
+fi
 sudo make uninstall "PREFIX=$PREFIX"
 systemctl --user daemon-reload
 

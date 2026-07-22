@@ -141,5 +141,8 @@ uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/scribe
 	rm -f $(DESTDIR)$(PREFIX)/share/applications/dev.scribe.Menu.desktop
 	rm -f $(DESTDIR)$(PREFIX)/lib/systemd/user/scribe.service
+	# This takes the Parakeet model with it -- 640 MB, silently. uninstall.sh
+	# says so first; a bare `make uninstall` does not, and cannot.
 	rm -rf $(DESTDIR)$(PREFIX)/share/scribe
+	rm -rf $(DESTDIR)$(PREFIX)/lib/scribe
 	$(MAKE) -C menu uninstall PREFIX=$(PREFIX) DESTDIR=$(DESTDIR)

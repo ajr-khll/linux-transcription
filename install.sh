@@ -20,6 +20,28 @@ die()  { printf '\033[31merror: %s\033[0m\n' "$1" >&2; exit 1; }
 [ -f Makefile ] && [ -d src ] || die "run this from the scribe source directory"
 [ "$(id -u)" -ne 0 ] || die "do not run this as root; it will sudo where needed"
 
+# Rewrites `key = value` in $CONFIG, appending the line if it is not there.
+#
+# The value goes through the environment, not through the script text.
+# Interpolating it into a sed replacement would let '|', '&' or a backslash in
+# the value corrupt it silently -- '&' expands to the whole matched line -- and
+# would put it in the process table for anyone running ps. awk reads it from
+# ENVIRON and treats it as plain data.
+set_config_key() {
+    _tmp="$(mktemp)"
+    chmod 600 "$_tmp"
+    SCRIBE_KEY="$1" SCRIBE_VALUE="$2" awk '
+        BEGIN { key = ENVIRON["SCRIBE_KEY"] }
+        $0 ~ "^[[:space:]]*" key "[[:space:]]*=" && !done {
+            print key " = " ENVIRON["SCRIBE_VALUE"]; done = 1; next
+        }
+        { print }
+        END { if (!done) print key " = " ENVIRON["SCRIBE_VALUE"] }
+    ' "$CONFIG" > "$_tmp"
+    mv "$_tmp" "$CONFIG"
+    chmod 600 "$CONFIG"
+}
+
 # ---- dependencies ----------------------------------------------------------
 # Build deps for the daemon, then the panel's runtime deps. The panel links
 # against none of its own -- it shells out to gjs, pactl, parec and journalctl
@@ -47,33 +69,6 @@ else
     warn "continuing; the build will tell you what is missing."
 fi
 
-# ---- build -----------------------------------------------------------------
-say "building"
-make
-make test
-
-say "installing to $PREFIX"
-sudo make install "PREFIX=$PREFIX"
-
-# ---- permissions -----------------------------------------------------------
-# scribe reads /dev/input/event* and writes /dev/uinput. It must NOT run as
-# root, so the user joins the input group instead.
-say "permissions"
-if id -nG | tr ' ' '\n' | grep -qx input; then
-    echo "    already in the input group"
-    NEED_LOGOUT=0
-else
-    sudo usermod -aG input "$USER"
-    warn "added $USER to the input group"
-    NEED_LOGOUT=1
-fi
-
-if ! stat -c '%G' /dev/uinput 2>/dev/null | grep -qx input; then
-    warn "/dev/uinput is not group 'input'; installing the udev rule"
-    sudo cp udev/99-scribe.rules /etc/udev/rules.d/
-    sudo udevadm control --reload && sudo udevadm trigger
-fi
-
 # ---- migration from whisprd ------------------------------------------------
 # The project was called whisprd before 0.2.0. Move the old config and
 # transcripts across, or an upgrade starts from an empty config and leaves a
@@ -82,8 +77,8 @@ fi
 # mv rather than cp: config.ini is 0600 because it holds the key, and mv keeps
 # the mode where cp would apply the umask. Nothing is ever overwritten -- if
 # both exist the new one wins and the old is left alone for you to inspect.
-# This runs before the config section below, so the "no key set" check sees
-# the migrated file rather than a fresh empty one.
+# This runs before the engine and config sections below, so both read the
+# migrated file rather than a fresh empty one.
 migrate() {
     _old="$1"
     _new="$2"
@@ -107,6 +102,75 @@ if [ -e "$OLD_CONFIG_DIR" ] || [ -e "$OLD_DATA_DIR" ]; then
     fi
 fi
 
+# ---- engine ----------------------------------------------------------------
+# Asked here rather than with the rest of the config, because the answer
+# changes how the daemon compiles: the local engine is a build flag, not a
+# runtime switch.
+say "transcription engine"
+ENGINE=openai
+if [ -f "$CONFIG" ] && grep -qE '^[[:space:]]*engine[[:space:]]*=[[:space:]]*parakeet' "$CONFIG"; then
+    # Same reasoning as the API key check below: a re-run should not re-ask a
+    # question the config already answers.
+    ENGINE=parakeet
+    echo "    keeping engine = parakeet from $CONFIG"
+elif [ -f "$CONFIG" ] && grep -qE '^[[:space:]]*engine[[:space:]]*=[[:space:]]*openai' "$CONFIG"; then
+    echo "    keeping engine = openai from $CONFIG"
+elif [ -t 0 ]; then
+    cat <<'EOF'
+    1) local   Parakeet runs on this machine. No account, no key, no bill,
+               and nothing you dictate leaves the computer. Costs a 490 MB
+               download, about 1 GB of memory while running, and covers 25
+               European languages.
+    2) cloud   OpenAI Whisper. Needs an API key and a card on file, and
+               every utterance is uploaded. Covers about 99 languages.
+EOF
+    printf '    pick 1 or 2 [1]: '
+    read -r REPLY || REPLY=""
+    case "$REPLY" in
+        2) ENGINE=openai ;;
+        *) ENGINE=parakeet ;;
+    esac
+else
+    warn "not a terminal; defaulting to the cloud engine"
+fi
+echo "    engine: $ENGINE"
+
+MAKE_ARGS="PREFIX=$PREFIX"
+if [ "$ENGINE" = parakeet ]; then
+    ./install-parakeet.sh
+    MAKE_ARGS="$MAKE_ARGS WITH_PARAKEET=1"
+fi
+
+# ---- build -----------------------------------------------------------------
+say "building"
+# shellcheck disable=SC2086  # MAKE_ARGS is a word list on purpose
+make $MAKE_ARGS
+make test
+
+say "installing to $PREFIX"
+# The same arguments as the build: a different flag here would relink the
+# binary without the engine that was just downloaded for it.
+sudo make install $MAKE_ARGS
+
+# ---- permissions -----------------------------------------------------------
+# scribe reads /dev/input/event* and writes /dev/uinput. It must NOT run as
+# root, so the user joins the input group instead.
+say "permissions"
+if id -nG | tr ' ' '\n' | grep -qx input; then
+    echo "    already in the input group"
+    NEED_LOGOUT=0
+else
+    sudo usermod -aG input "$USER"
+    warn "added $USER to the input group"
+    NEED_LOGOUT=1
+fi
+
+if ! stat -c '%G' /dev/uinput 2>/dev/null | grep -qx input; then
+    warn "/dev/uinput is not group 'input'; installing the udev rule"
+    sudo cp udev/99-scribe.rules /etc/udev/rules.d/
+    sudo udevadm control --reload && sudo udevadm trigger
+fi
+
 # ---- config ----------------------------------------------------------------
 say "configuration"
 mkdir -p "$CONFIG_DIR"
@@ -119,10 +183,17 @@ else
     echo "    wrote $CONFIG"
 fi
 
+set_config_key engine "$ENGINE"
+echo "    engine = $ENGINE"
+
+# The local engine needs no key at all, so do not ask for one. Asking anyway is
+# how a program teaches people that its questions can be ignored.
+if [ "$ENGINE" = parakeet ]; then
+    echo "    no API key needed"
 # The key is required -- the daemon refuses to start without one -- so ask now
 # rather than let the first run fail. Read with the terminal echo off, and
 # written with an existing-key check so re-running the installer is safe.
-if [ -n "${OPENAI_API_KEY:-}" ]; then
+elif [ -n "${OPENAI_API_KEY:-}" ]; then
     echo "    using OPENAI_API_KEY from the environment"
 elif grep -qE '^[[:space:]]*api_key[[:space:]]*=[[:space:]]*sk-' "$CONFIG"; then
     echo "    key already set in $CONFIG"
@@ -134,21 +205,7 @@ elif [ -t 0 ]; then
     stty echo 2>/dev/null || true
     printf '\n'
     if [ -n "$KEY" ]; then
-        # The key goes through the environment, not through the script text.
-        # Interpolating it into a sed replacement would let '|', '&' or a
-        # backslash in the key corrupt it silently -- '&' expands to the whole
-        # matched line -- and would put it in the process table for anyone
-        # running ps. awk reads it from ENVIRON and treats it as plain data.
-        tmp="$(mktemp)"
-        chmod 600 "$tmp"
-        SCRIBE_KEY="$KEY" awk '
-            /^[[:space:]]*api_key[[:space:]]*=/ && !done {
-                print "api_key      = " ENVIRON["SCRIBE_KEY"]; done = 1; next
-            }
-            { print }
-        ' "$CONFIG" > "$tmp"
-        mv "$tmp" "$CONFIG"
-        chmod 600 "$CONFIG"
+        set_config_key api_key "$KEY"
         echo "    key written to $CONFIG (0600)"
     else
         warn "no key set; scribe will not start until you add one"
