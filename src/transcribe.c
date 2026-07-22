@@ -37,9 +37,13 @@ int transcribe_init(const config *cfg)
         return asr_parakeet_init(cfg);
 #else
         /* Naming the flag matters: without it this reads as an unknown engine,
-         * and the user goes looking for a typo in a word they spelled right. */
+         * and the user goes looking for a typo in a word they spelled right.
+         * The install step is named too -- rebuilding alone leaves the binary
+         * on $PATH exactly as it was, and the same message comes back. */
         log_err("engine = parakeet, but this build has no local engine.\n"
-                "Rebuild with: ./install-parakeet.sh && make WITH_PARAKEET=1\n");
+                "Rebuild and reinstall:\n"
+                "  ./install-parakeet.sh\n"
+                "  make WITH_PARAKEET=1 && sudo make install\n");
         return -1;
 #endif
     }

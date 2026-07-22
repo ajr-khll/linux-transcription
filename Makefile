@@ -66,6 +66,24 @@ LDLIBS += $(shell pkg-config --libs $(PKGS))
 
 OBJ := $(patsubst %.c,$(BUILD)/%.o,$(SRC)) $(patsubst $(BUILD)/%.c,$(BUILD)/%.o,$(GEN))
 
+# Make compares timestamps, not command lines, so changing a WITH_* flag
+# rebuilds only the files that flag adds or removes and relinks the rest as
+# they were. `make WITH_PARAKEET=1` over a plain build therefore produced a
+# binary that contained the whole local engine and a transcribe.o compiled
+# without -DWITH_PARAKEET, which refuses to use it -- a working engine and a
+# refusal to run it, in one executable, with nothing said about why.
+#
+# So record the flags in a file that every object depends on, rewritten only
+# when they actually change. $(file) rather than a shell redirect because
+# CFLAGS carries quotes that a shell would eat.
+BUILD_FLAGS := $(CFLAGS) $(LDLIBS)
+FLAGS_STAMP := $(BUILD)/.build-flags
+PREV_FLAGS  := $(if $(wildcard $(FLAGS_STAMP)),$(file < $(FLAGS_STAMP)))
+ifneq ($(BUILD_FLAGS),$(PREV_FLAGS))
+  $(shell mkdir -p $(BUILD))
+  $(file > $(FLAGS_STAMP),$(BUILD_FLAGS))
+endif
+
 .PHONY: all clean install uninstall test test-parakeet
 
 all: $(BUILD)/scribe
@@ -103,6 +121,11 @@ test-parakeet:
 
 $(BUILD)/scribe: $(OBJ)
 	$(CC) $(OBJ) $(LDFLAGS) $(LDLIBS) -o $@
+
+# Every object depends on the flags it was compiled with -- see FLAGS_STAMP
+# above. This must come after `all`, or the first object becomes the default
+# goal and a bare `make` builds one file and stops.
+$(OBJ): $(FLAGS_STAMP)
 
 # Generated protocol glue must exist before anything that includes it compiles.
 $(BUILD)/src/backends/wlr_vk.o: $(PROTO_H)
