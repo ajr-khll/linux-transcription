@@ -172,13 +172,19 @@ log a warning on every start.
 
 The handoff spec asked for TOML (`[hotkey] binding`, `[endpoint] provider`).
 That would not load: the daemon's parser (`src/config.c`) reads the INI keys
-`hotkey`, `endpoint_url`, `model`, `api_key`, `source`, `backend`, `layout`,
-`variant`, `paste_chord`. The panels map onto those.
+`hotkey`, `engine`, `model_dir`, `threads`, `endpoint_url`, `model`, `api_key`,
+`source`, `backend`, `layout`, `variant`, `paste_chord`. The panels map onto
+those.
+
+Every one of them has to appear in `KEYS` in `src/config.js`, panel or no
+panel: `save()` rewrites the whole file from that list, so a key missing from
+it is dropped from the user's config the next time anything is saved.
 
 ### The API key
 
 An editable entry, masked until `[show]`, never logged. The file is written
-`0600`.
+`0600`. With `engine = parakeet` it is left blank and not flagged — the local
+engine never sends anything anywhere.
 
 It is saved on `Enter` and on focus-out, not per keystroke: saving runs
 `persist()`, which SIGHUPs the daemon and rebuilds its whole capture stack.

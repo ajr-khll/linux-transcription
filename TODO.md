@@ -28,7 +28,7 @@ header and rebuilding, which is not a fix a user has.
 ## Settings the menu cannot reach
 
 `scribe-menu` replaced the old GTK4 settings app, and three settings lost
-their UI in the move. All three still work — the daemon reads them from
+their UI in the move. All of these still work — the daemon reads them from
 `config.ini`, and `menu/src/config.js` keeps them in `KEYS[]` so the menu
 round-trips them untouched rather than dropping them on save. They just have
 no panel, and the defaults are what most people want.
@@ -41,6 +41,13 @@ no panel, and the defaults are what most people want.
 - **Test injection** — `scribe --say TEXT` confirms the backend works without
   speaking. The old GUI had a button for it; the CLI flag is unchanged. Worth
   a `[ test ]` button next to the backend dropdown.
+- **`engine`** — switching between the cloud and local transcribers is a hand
+  edit. A toggle would be the obvious place for it, but it can only offer
+  `parakeet` when the daemon was built with `WITH_PARAKEET=1`, and the panel
+  has no way to ask: it does not link against the daemon. `scribe -V` or a
+  new flag reporting the compiled-in engines would settle it first.
+- **`model_dir` / `threads`** — only read by the local engine, and only worth
+  touching if the model lives somewhere unusual or the machine is small.
 
 ## The systemd unit and install.sh
 

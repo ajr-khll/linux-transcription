@@ -2,9 +2,29 @@
 # evdev key name to hold. Single key or "MOD+KEY".
 hotkey = KEY_RIGHTCTRL
 
+# --- engine ---
+# Which transcriber runs.
+#
+#   openai     upload each utterance to OpenAI. Needs an api_key below.
+#              About 99 languages.
+#   parakeet   NVIDIA Parakeet TDT 0.6B v3, decoded on this machine. No key,
+#              no bill, no network, and nothing spoken leaves the computer.
+#              Costs about 1 GB of memory while running, and covers 25
+#              European languages. Only in builds made with WITH_PARAKEET=1;
+#              run ./install-parakeet.sh to get one.
+engine = openai
+
+# --- parakeet ---
+# Where the model files live. Empty = where install-parakeet.sh puts them,
+# /usr/local/share/scribe/models/parakeet-tdt-0.6b-v3-int8.
+model_dir =
+# Decode threads. 0 = 4, which keeps a 0.6B model busy without taking the
+# machine over. Raise it if transcripts lag; lower it on a small laptop.
+threads = 0
+
 # --- openai ---
-# REQUIRED. scribe will not start without a key.
-# Get one at https://platform.openai.com/api-keys
+# Required when engine = openai; ignored otherwise. scribe will not start
+# without a key. Get one at https://platform.openai.com/api-keys
 #
 # $OPENAI_API_KEY in the environment overrides this line. Prefer that if you
 # sync or back up your dotfiles -- this file is 0600, but a synced 0600 file
@@ -14,10 +34,10 @@ api_key      =
 # whisper-1 | gpt-4o-transcribe | gpt-4o-mini-transcribe
 model        = whisper-1
 
-# Every utterance is uploaded to this endpoint. Changing it to an
-# OpenAI-compatible server (whisper.cpp and friends) does work -- the request
-# is the same multipart POST either way -- but it is not a supported or tested
-# path, so leave it alone unless you know what you are doing.
+# Where the audio goes when engine = openai. Pointing it at an
+# OpenAI-compatible server does work -- the request is the same multipart POST
+# either way -- but it is not a tested path. For local transcription prefer
+# engine = parakeet, which needs no server at all.
 endpoint_url = https://api.openai.com/v1
 
 # --- capture ---

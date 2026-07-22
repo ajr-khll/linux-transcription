@@ -9,8 +9,14 @@
 import GLib from "gi://GLib";
 import Gio from "gi://Gio";
 
+/* Every key the daemon reads has to be listed here, whether or not a panel
+ * edits it. save() rewrites the whole file from this object, so anything
+ * missing is dropped from the user's config on the next save -- silently, and
+ * for a key like `engine` that means their local transcriber quietly becomes
+ * an upload. */
 export const KEYS = [
-    "hotkey", "source", "endpoint_url", "model", "api_key",
+    "hotkey", "source", "engine", "model_dir", "threads",
+    "endpoint_url", "model", "api_key",
     "backend", "layout", "variant", "paste_chord",
     "history", "history_dir",
 ];
@@ -34,6 +40,9 @@ export function defaults() {
     return {
         hotkey: "KEY_RIGHTCTRL",
         source: "",
+        engine: "openai",
+        model_dir: "",
+        threads: "0",
         endpoint_url: "https://api.openai.com/v1",
         model: "whisper-1",
         api_key: "",
@@ -107,8 +116,19 @@ history = ${cfg.history}
 # empty = ~/.local/share/scribe/transcriptions
 history_dir = ${cfg.history_dir}
 
+# --- engine ---
+# openai   = upload each utterance to OpenAI; needs api_key below.
+# parakeet = transcribe on this machine; no key, nothing uploaded.
+engine = ${cfg.engine}
+
+# --- parakeet ---
+# empty = /usr/local/share/scribe/models/parakeet-tdt-0.6b-v3-int8
+model_dir = ${cfg.model_dir}
+# decode threads; 0 = 4
+threads = ${cfg.threads}
+
 # --- openai ---
-# Required. Get one at https://platform.openai.com/api-keys
+# Required when engine = openai. Get one at https://platform.openai.com/api-keys
 # $OPENAI_API_KEY in the environment overrides this.
 api_key      = ${cfg.api_key}
 model        = ${cfg.model}

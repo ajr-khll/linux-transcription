@@ -330,11 +330,15 @@ function renderKey() {
     keyToggle.set_label(keyShown ? "[hide]" : "[show]");
 
     const fromEnv = envKey.length > 0;
+    const local = cfg.engine === "parakeet";
     keyEntry.set_sensitive(!fromEnv);
-    keyEntry.set_placeholder_text(fromEnv ? "set by OPENAI_API_KEY" : "sk-…");
+    keyEntry.set_placeholder_text(
+        fromEnv ? "set by OPENAI_API_KEY" : local ? "not used by the local engine" : "sk-…");
     /* An empty key is the one state where nothing works at all, so it reads as
-     * a prompt rather than as an ordinary blank field. */
-    if (!fromEnv && !(cfg.api_key ?? "").length) keyEntry.add_css_class("needed");
+     * a prompt rather than as an ordinary blank field. Not with the local
+     * engine, though: there it is an ordinary blank field, and colouring it
+     * red would send people hunting for a key they do not need. */
+    if (!fromEnv && !local && !(cfg.api_key ?? "").length) keyEntry.add_css_class("needed");
     else keyEntry.remove_css_class("needed");
 }
 

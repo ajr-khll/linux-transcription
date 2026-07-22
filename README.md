@@ -3,13 +3,18 @@
 Hold-to-talk voice transcription for Linux. Press and hold a key, speak, release —
 the text lands in whatever window has focus.
 
-The daemon holds no model and does no inference. It captures 16 kHz mono audio and
-POSTs it to OpenAI's `/audio/transcriptions`. You supply an API key.
+It captures 16 kHz mono audio and transcribes it one of two ways, set by `engine`
+in the config:
 
-**Everything you dictate is uploaded to OpenAI.** That is the design: a thin client,
-not a local transcriber. Do not dictate anything you would not paste into a web form.
-Pointing `endpoint_url` at a local OpenAI-compatible server works — the request is the
-same — but it is untested and unsupported.
+- **`parakeet`** — NVIDIA Parakeet TDT 0.6B v3, decoded in the daemon's own
+  process. No account, no key, no bill, no network. **Nothing you say leaves the
+  machine.**
+- **`openai`** — a multipart POST to OpenAI's `/audio/transcriptions`. You supply
+  an API key, and **everything you dictate is uploaded.**
+
+`openai` is the default, because it is what existing installs already run and it is
+the only option for the ~74 languages Parakeet does not cover. Pick the local engine
+during `./install.sh`, or see [Local transcription](#local-transcription) below.
 
 ## Status
 
@@ -18,6 +23,7 @@ same — but it is untested and unsupported.
 | config, evdev hotkey, epoll input loop | done |
 | persistent 16 kHz capture + gating | done |
 | in-memory WAV + multipart POST + JSON parse | done |
+| on-device Parakeet via sherpa-onnx (`WITH_PARAKEET=1`) | done |
 | `wlr-vk` backend (Hyprland/Sway/river/Wayfire) | done |
 | `clipboard` backend (universal fallback) | done |
 | `uinput-layout` backend (GNOME/KDE direct typing) | done |
@@ -27,21 +33,21 @@ On GNOME/KDE Wayland, auto-detection lands on `uinput`.
 
 ## Install
 
-Get an OpenAI API key first — [platform.openai.com/api-keys][keys]. scribe will not
-start without one.
-
-[keys]: https://platform.openai.com/api-keys
-
 ```sh
 git clone https://github.com/ajr-khll/linux-transcription
 cd linux-transcription
 ./install.sh
 ```
 
-The script installs dependencies (dnf/apt/pacman), builds, installs to `/usr/local`,
-adds you to the `input` group, seeds the config, asks for your key, and enables the
-systemd user service. **Log out and back in afterwards** — group membership is read
-when your session starts, so the service cannot open `/dev/uinput` until then.
+The script asks which engine you want first, since the local one is a compile flag
+rather than a runtime switch. Then it installs dependencies (dnf/apt/pacman), builds,
+installs to `/usr/local`, adds you to the `input` group, seeds the config, and enables
+the systemd user service. Pick cloud and it asks for your API key
+([platform.openai.com/api-keys][keys]); pick local and it never mentions one.
+**Log out and back in afterwards** — group membership is read when your session
+starts, so the service cannot open `/dev/uinput` until then.
+
+[keys]: https://platform.openai.com/api-keys
 
 Then:
 
@@ -51,8 +57,9 @@ scribe --say "hello"      # test injection without speaking
 scribe-menu               # settings and history panel
 ```
 
-`./uninstall.sh` reverses it: stops the service, removes the binaries and the udev
-rule, and leaves your config in place.
+`./uninstall.sh` reverses it: stops the service, removes the binaries, the udev rule
+and any downloaded model, and leaves your config in place. It names the model
+directory and its size before deleting it.
 
 ### By hand
 
@@ -79,7 +86,55 @@ systemctl --user daemon-reload
 systemctl --user enable --now scribe
 ```
 
-`make WITH_WLR_VK=0` drops the Wayland backend; `make WITH_MENU=0` drops the panel.
+`make WITH_WLR_VK=0` drops the Wayland backend; `make WITH_MENU=0` drops the panel;
+`make WITH_PARAKEET=1` adds the local engine (see below).
+
+## Local transcription
+
+```sh
+./install-parakeet.sh          # ~490 MB, ~640 MB on disk
+make WITH_PARAKEET=1 && sudo make install
+```
+
+Then set `engine = parakeet` in `~/.config/scribe/config.ini` and
+`systemctl --user reload scribe`. `./install.sh` does all of this for you if you
+pick local when it asks.
+
+What it costs and what it buys:
+
+| | |
+|---|---|
+| Download | ~490 MB (a 25 MB runtime plus the model) |
+| Disk | ~640 MB under `/usr/local/share/scribe/models` |
+| Memory | ~1 GB resident while the daemon runs, loaded at start and kept |
+| Startup | a second or two to load the model; logged, so you can see why |
+| Languages | 25 European. For anything else, use `engine = openai` |
+| Network | none. Nothing you dictate leaves the machine |
+| Cost | none |
+
+The model loads once and stays loaded: `SIGHUP` — which `scribe-menu` sends on every
+settings save — does *not* reload it unless `model_dir` or `threads` changed.
+
+`threads` sets the decode thread count (`0` means 4). `model_dir` points at the model
+if you put it somewhere other than the default.
+
+Check an install without a microphone:
+
+```sh
+make test-parakeet
+build/test_parakeet /usr/local/share/scribe/models/parakeet-tdt-0.6b-v3-int8/test.wav
+```
+
+That loads the model, decodes the sample shipped with it, and checks that a second
+load reuses the first. It is kept out of `make test` because a plain checkout has no
+model to give it.
+
+Under the hood this is [sherpa-onnx][sherpa] (Apache-2.0), pinned to v1.13.4 and
+installed to `/usr/local/lib/scribe`. It bundles its own ONNX Runtime, so there is no
+system-wide dependency to hunt down and nothing is added to `ldconfig` — the daemon
+finds it by rpath.
+
+[sherpa]: https://github.com/k2-fsa/sherpa-onnx
 
 ### The service does not start
 
@@ -107,12 +162,15 @@ opens `/dev/uinput` write-only, so the common `0620` mode is fine.)
 
 `~/.config/scribe/config.ini`, mode `0600`. See `config.ini.example`.
 
-`api_key` is the only required setting. `OPENAI_API_KEY` in the environment overrides
-it — prefer that if you sync or back up your dotfiles, since a synced `0600` file is
-still a copy of your key on someone else's disk.
+`engine` picks the transcriber: `openai` (the default) or `parakeet`.
 
-`model` picks the transcription model: `whisper-1`, `gpt-4o-transcribe`, or
-`gpt-4o-mini-transcribe`.
+With `engine = openai`, `api_key` is required. `OPENAI_API_KEY` in the environment
+overrides it — prefer that if you sync or back up your dotfiles, since a synced `0600`
+file is still a copy of your key on someone else's disk. `model` picks the model:
+`whisper-1`, `gpt-4o-transcribe`, or `gpt-4o-mini-transcribe`.
+
+With `engine = parakeet`, none of those are read. `model_dir` and `threads` apply
+instead — see [Local transcription](#local-transcription).
 
 `audio_cues = on` (the default) plays a short tone so you can dictate without
 watching the screen: a rising pair when the hotkey goes down, a falling pair
@@ -137,8 +195,8 @@ past sessions.
 See `menu/README.md` for dependencies, compositor rules and key bindings. Install
 without it via `make WITH_MENU=0`.
 
-Three settings have no panel yet — `backend`, `paste_chord`, and the injection test —
-and are edited in `config.ini` directly. See `TODO.md`.
+Some settings have no panel yet — `backend`, `paste_chord`, the injection test, and
+the engine keys — and are edited in `config.ini` directly. See `TODO.md`.
 
 ## Picking a microphone
 
@@ -152,7 +210,7 @@ scribe --list-sources          # samples each device and prints its peak level
 If transcripts come back as plausible nonsense — `you`, `Thank you.`, `Subtitles by
 the Amara.org community` — you are recording the wrong source. Whisper does not return
 an empty string for audio with no voice in it; it emits caption boilerplate memorised
-from training. scribe refuses two kinds of utterance before spending a request on them:
+from training. scribe refuses two kinds of utterance before transcribing them at all:
 
 - **Silent.** Peaks below 2% of full scale. A live microphone reads well above that;
   an unplugged jack sits below it.
@@ -209,7 +267,8 @@ Force one with `backend = wlr-vk | uinput | clipboard`.
 
 ## Design notes
 
-- **No resampling.** The stream opens at exactly 16 kHz mono S16 — what Whisper wants.
+- **No resampling.** The stream opens at exactly 16 kHz mono S16 — what Whisper wants,
+  and what Parakeet wants too.
 - **Persistent capture** plus a 250 ms rolling pre-roll prepended to each utterance, so
   the first consonant survives the gap between keypress and the daemon noticing.
 - **The input thread never blocks.** It flips an atomic and returns to `epoll`, so
@@ -227,6 +286,15 @@ Source files carry an `SPDX-License-Identifier: GPL-3.0-only` header.
 `protocol/virtual-keyboard-unstable-v1.xml` is vendored, not original. It is MIT
 licensed (Kristian Høgsberg, Intel, Collabora, Purism) and keeps its notice inline; MIT
 is GPL-compatible.
+
+Built with `WITH_PARAKEET=1`, scribe links **sherpa-onnx** (Apache-2.0) and the ONNX
+Runtime it bundles (MIT). Both are GPLv3-compatible. Neither is vendored here —
+`install-parakeet.sh` downloads the upstream release.
+
+The model is **NVIDIA Parakeet TDT 0.6B v3**, licensed
+[CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/). It is downloaded, not
+shipped, and it is data rather than a linked work — but if you redistribute it,
+attribute NVIDIA.
 
 The libraries scribe links (libevdev, libpulse, libcurl, wayland-client, libxkbcommon)
 are MIT or LGPL and compatible with GPLv3. One caveat: libcurl built against OpenSSL
