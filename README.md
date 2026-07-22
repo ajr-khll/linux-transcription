@@ -96,6 +96,12 @@ systemctl --user enable --now scribe
 make WITH_PARAKEET=1 && sudo make install
 ```
 
+The flag is needed once, not on every command: it is recorded in
+`build/config.mk` and reused by every later `make` in that tree, so
+`sudo make install` installs the engine you just built rather than quietly
+rebuilding without it. `make WITH_PARAKEET=0` turns it back off; `make clean`
+forgets the setting.
+
 Then set `engine = parakeet` in `~/.config/scribe/config.ini` and
 `systemctl --user reload scribe`. `./install.sh` does all of this for you if you
 pick local when it asks.

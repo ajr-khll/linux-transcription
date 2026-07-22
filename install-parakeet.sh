@@ -4,7 +4,8 @@
 # engine, but it stands alone and is safe to re-run -- every step is skipped
 # if its output is already there, so a second run downloads nothing.
 #
-# Afterwards, build with:  make WITH_PARAKEET=1
+# Afterwards:  make WITH_PARAKEET=1 && sudo make install
+# The flag is needed once. The Makefile records it and later builds keep it.
 set -eu
 
 PREFIX="${PREFIX:-/usr/local}"

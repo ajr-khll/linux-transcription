@@ -2,6 +2,15 @@ VERSION     := 0.1.0
 PREFIX      ?= /usr/local
 BUILD       ?= build
 
+# The WITH_* switches below are configure-time choices, not per-command ones,
+# so they are remembered here and reused by every later make in this tree.
+# Without that, `make install` after `make WITH_PARAKEET=1` quietly rebuilds
+# without the local engine and installs that instead -- the flag is on the
+# command line that builds and absent from the one that installs, and nothing
+# says so. A switch given on the command line still wins, and is remembered in
+# its turn; `make clean` forgets the lot.
+-include $(BUILD)/config.mk
+
 # Backends are opt-out so users only pull in what their session needs.
 WITH_WLR_VK ?= 1
 WITH_UINPUT_LAYOUT ?= 1
@@ -15,6 +24,20 @@ WITH_PARAKEET ?= 0
 SHERPA_PREFIX ?= $(PREFIX)/lib/scribe
 SHERPA_INCLUDE ?= third_party/sherpa-onnx/include
 PARAKEET_MODEL_DIR ?= $(PREFIX)/share/scribe/models/parakeet-tdt-0.6b-v3-int8
+
+# Written only when the choices actually change. Rewriting it every time would
+# hand the file to root the first time anyone runs `sudo make install`, and the
+# next unprivileged make could not update it.
+define CONFIG_MK_TEXT
+WITH_WLR_VK := $(WITH_WLR_VK)
+WITH_UINPUT_LAYOUT := $(WITH_UINPUT_LAYOUT)
+WITH_MENU := $(WITH_MENU)
+WITH_PARAKEET := $(WITH_PARAKEET)
+endef
+ifneq ($(CONFIG_MK_TEXT),$(if $(wildcard $(BUILD)/config.mk),$(file < $(BUILD)/config.mk)))
+  $(shell mkdir -p $(BUILD))
+  $(file > $(BUILD)/config.mk,$(CONFIG_MK_TEXT))
+endif
 
 PKGS        := libevdev libpulse libpulse-simple libcurl
 CFLAGS      ?= -O2 -g
