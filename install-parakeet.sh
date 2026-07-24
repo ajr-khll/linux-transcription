@@ -21,8 +21,24 @@ MODEL_NAME=parakeet-tdt-0.6b-v3-int8
 MODEL_ARCHIVE=sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8
 MODEL_URL="$SHERPA_BASE/asr-models/$MODEL_ARCHIVE.tar.bz2"
 
+# The live preview's model. Parakeet cannot stream -- it is an offline model
+# and NVIDIA publishes no streaming export -- so the preview that appears while
+# you are still speaking comes from this small zipformer instead. It is less
+# accurate, which costs nothing: Parakeet decodes the sealed utterance on
+# release and its answer replaces the preview.
+LIVE_NAME=streaming-zipformer-en
+LIVE_ARCHIVE=sherpa-onnx-streaming-zipformer-en-2023-06-26
+LIVE_URL="$SHERPA_BASE/asr-models/$LIVE_ARCHIVE.tar.bz2"
+# Upstream names these after the training epoch and the chunk geometry. The
+# daemon looks for the same four names it uses for Parakeet, so rename on the
+# way in and keep asr_stream.c out of the business of tracking archive names.
+LIVE_ENCODER=encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx
+LIVE_DECODER=decoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx
+LIVE_JOINER=joiner-epoch-99-avg-1-chunk-16-left-128.int8.onnx
+
 LIB_DIR="$PREFIX/lib/scribe"
 MODEL_DIR="$PREFIX/share/scribe/models/$MODEL_NAME"
+LIVE_DIR="$PREFIX/share/scribe/models/$LIVE_NAME"
 # The compile step needs the headers, and they must match the .so exactly, so
 # they stay in the build tree rather than being installed system-wide.
 INCLUDE_DIR="third_party/sherpa-onnx/include"
@@ -115,11 +131,42 @@ else
     echo "    installed the model to $MODEL_DIR"
 fi
 
+# ---- live model ------------------------------------------------------------
+say "streaming zipformer (live preview)"
+if [ -f "$LIVE_DIR/encoder.int8.onnx" ]; then
+    echo "    already installed in $LIVE_DIR, skipping"
+else
+    echo "    about to download about 70 MB"
+    fetch "$LIVE_URL" "$TMP/live.tar.bz2"
+    tar xjf "$TMP/live.tar.bz2" -C "$TMP"
+    SRC="$TMP/$LIVE_ARCHIVE"
+    [ -f "$SRC/$LIVE_ENCODER" ] || die "unexpected archive layout in $LIVE_ARCHIVE"
+
+    sudo install -Dm644 "$SRC/$LIVE_ENCODER" "$LIVE_DIR/encoder.int8.onnx"
+    sudo install -Dm644 "$SRC/$LIVE_DECODER" "$LIVE_DIR/decoder.int8.onnx"
+    sudo install -Dm644 "$SRC/$LIVE_JOINER"  "$LIVE_DIR/joiner.int8.onnx"
+    sudo install -Dm644 "$SRC/tokens.txt"    "$LIVE_DIR/tokens.txt"
+
+    # One 16 kHz sample survives as test.wav, for `make test-stream`. Unlike the
+    # Parakeet test this one cannot resample: an online recognizer is fed at the
+    # rate it was built for, so the sample has to already be at 16 kHz. These
+    # are.
+    SAMPLE="$SRC/test_wavs/0.wav"
+    [ -f "$SAMPLE" ] || SAMPLE="$(find "$SRC/test_wavs" -name '*.wav' 2>/dev/null | sort | head -n 1)"
+    if [ -n "$SAMPLE" ]; then
+        sudo install -Dm644 "$SAMPLE" "$LIVE_DIR/test.wav"
+    else
+        warn "no sample WAV in the archive; make test-stream needs one of your own"
+    fi
+    echo "    installed the live model to $LIVE_DIR"
+fi
+
 # ---- done ------------------------------------------------------------------
 say "ready"
 cat <<EOF
     runtime   $LIB_DIR
     model     $MODEL_DIR
+    live      $LIVE_DIR
     headers   $INCLUDE_DIR
 
 Build and install the daemon against it:
@@ -128,5 +175,6 @@ Build and install the daemon against it:
 Then set in ~/.config/scribe/config.ini:
     engine = parakeet
 
-The model is NVIDIA Parakeet TDT 0.6B v3, licensed CC-BY-4.0.
+The transcriber is NVIDIA Parakeet TDT 0.6B v3, licensed CC-BY-4.0.
+The live preview is a k2-fsa streaming zipformer, licensed Apache-2.0.
 EOF

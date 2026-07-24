@@ -75,6 +75,26 @@ int config_parse_key_name(const char *name)
     return -1;
 }
 
+bool config_hotkey_holds_modifier(const config *cfg)
+{
+    static const int mods[] = {
+        KEY_LEFTCTRL,  KEY_RIGHTCTRL,
+        KEY_LEFTSHIFT, KEY_RIGHTSHIFT,
+        KEY_LEFTALT,   KEY_RIGHTALT,
+        KEY_LEFTMETA,  KEY_RIGHTMETA,
+    };
+
+    /* Any modifier in the chord counts, not just the held key itself: holding
+     * "alt+z" keeps Alt down for as long as the hotkey is down. */
+    if (cfg->n_mods > 0)
+        return true;
+
+    for (size_t i = 0; i < sizeof(mods) / sizeof(mods[0]); i++)
+        if (cfg->hotkey_code == mods[i])
+            return true;
+    return false;
+}
+
 /* Parses "MOD+MOD+KEY" into a trailing key plus its required modifiers.
  *
  * Parses into locals and only writes to the caller on success. A partially
@@ -153,6 +173,14 @@ static void default_path(char *out, size_t n)
         snprintf(out, n, "%s/.config/scribe/config.ini", getenv("HOME") ? getenv("HOME") : ".");
 }
 
+void config_resolve_path(char *out, size_t n, const char *override)
+{
+    if (override && *override)
+        snprintf(out, n, "%s", override);
+    else
+        default_path(out, n);
+}
+
 /* The environment wins over the file. Keeping the key out of config.ini is the
  * point: dotfiles get synced, backed up and occasionally committed, and a
  * leaked OpenAI key costs real money. OPENAI_API_KEY is the name every other
@@ -180,13 +208,18 @@ int config_load(config *cfg, const char *path)
     /* On by default: with no cue the user gets no sign the hotkey registered
      * until the text appears, and none at all when it does not. */
     cfg->audio_cues = true;
+    /* Off by default. The preview types into whatever window has focus while
+     * the key is still down, and what it types is a guess that gets corrected a
+     * moment later -- rougher than the one-shot behaviour, and rough in someone
+     * else's document. That is a thing to opt into. */
+    cfg->live = false;
     cfg->paste_key = KEY_V;
     cfg->paste_mods[0] = KEY_LEFTCTRL;
     cfg->n_paste_mods = 1;
 
     char buf[512];
     if (!path) {
-        default_path(buf, sizeof(buf));
+        config_resolve_path(buf, sizeof(buf), NULL);
         path = buf;
     }
 
@@ -227,6 +260,11 @@ int config_load(config *cfg, const char *path)
             snprintf(cfg->model_dir, sizeof(cfg->model_dir), "%s", val);
         } else if (strcmp(key, "threads") == 0) {
             cfg->threads = atoi(val);
+        } else if (strcmp(key, "live") == 0) {
+            cfg->live = strcmp(val, "on") == 0 || strcmp(val, "true") == 0 ||
+                        strcmp(val, "yes") == 0 || strcmp(val, "1") == 0;
+        } else if (strcmp(key, "live_model_dir") == 0) {
+            snprintf(cfg->live_model_dir, sizeof(cfg->live_model_dir), "%s", val);
         } else if (strcmp(key, "endpoint_url") == 0) {
             snprintf(cfg->endpoint_url, sizeof(cfg->endpoint_url), "%s", val);
         } else if (strcmp(key, "model") == 0) {

@@ -150,6 +150,14 @@ int main(void)
     /* German: 'z' and 'y' are swapped relative to QWERTY (QWERTZ). */
     expect_key("de", 'z', KEY_Y, 0, "de: 'z' is on the physical Y key (QWERTZ)");
 
+    /* Live mode retracts a preview by asking the injector to type U+0008.
+     * xkbcommon reports XKB_KEY_BackSpace as that codepoint, so the build_map
+     * walk records KEY_BACKSPACE like any other character and ul_send needs no
+     * special case. Asserted on two layouts because the whole retraction path
+     * rests on it. */
+    expect_key("us", '\b', KEY_BACKSPACE, 0, "us: U+0008 is KEY_BACKSPACE, unmodified");
+    expect_key("fr", '\b', KEY_BACKSPACE, 0, "fr: U+0008 is KEY_BACKSPACE, unmodified");
+
     /* Known limitation, asserted so it cannot regress silently: characters no
      * key produces (curly quotes, em dash -- which Whisper does emit) have no
      * mapping on a plain us layout and are dropped by ul_send. */

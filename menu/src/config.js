@@ -16,6 +16,7 @@ import Gio from "gi://Gio";
  * an upload. */
 export const KEYS = [
     "hotkey", "source", "engine", "model_dir", "threads",
+    "live", "live_model_dir",
     "endpoint_url", "model", "api_key",
     "backend", "layout", "variant", "paste_chord",
     "history", "history_dir",
@@ -43,6 +44,10 @@ export function defaults() {
         engine: "openai",
         model_dir: "",
         threads: "0",
+        /* Matches the daemon's default: opt-in, because the preview types a
+         * guess into whatever window has focus. */
+        live: "off",
+        live_model_dir: "",
         endpoint_url: "https://api.openai.com/v1",
         model: "whisper-1",
         api_key: "",
@@ -126,6 +131,14 @@ engine = ${cfg.engine}
 model_dir = ${cfg.model_dir}
 # decode threads; 0 = 4
 threads = ${cfg.threads}
+
+# --- live preview ---
+# on = type words as you speak, then replace them with the transcript when you
+# let go. Off by default. Needs engine = parakeet, a backend that can erase
+# (not clipboard), and a hotkey that is not a modifier.
+live = ${cfg.live}
+# empty = /usr/local/share/scribe/models/streaming-zipformer-en
+live_model_dir = ${cfg.live_model_dir}
 
 # --- openai ---
 # Required when engine = openai. Get one at https://platform.openai.com/api-keys

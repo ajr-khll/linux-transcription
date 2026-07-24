@@ -66,6 +66,23 @@ out:
     free(cps);
 }
 
+/* Live mode erases by typing U+0008, so the keymap has to carry BackSpace.
+ * Without the case in keysym_for, xkb_utf32_to_keysym(8) returns NoSymbol and
+ * the Unicode fallback builds U+01000008, which compiles fine and erases
+ * nothing -- a failure that would only ever show up on a live compositor. */
+static void expect_backspace(void)
+{
+    xkb_keysym_t ks = keysym_for('\b');
+    int ok = ks == XKB_KEY_BackSpace;
+    printf("%s  U+0008 maps to the BackSpace keysym\n", ok ? "PASS" : "FAIL");
+    if (!ok) {
+        char name[64];
+        xkb_keysym_get_name(ks, name, sizeof(name));
+        printf("      got %s (0x%X)\n", name, ks);
+        fails++;
+    }
+}
+
 int main(void)
 {
     round_trip("Hello, world!");
@@ -75,6 +92,8 @@ int main(void)
     round_trip("em dash — ellipsis… curly “quotes”");
     round_trip("emoji 😀 and CJK 日本語");
     round_trip("tab\there\nnewline");
+    round_trip("retract\b\b\bmore");
+    expect_backspace();
 
     printf("\n%s (%d failures)\n", fails ? "FAILED" : "all passed", fails);
     return fails != 0;

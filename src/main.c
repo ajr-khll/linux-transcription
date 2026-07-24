@@ -9,10 +9,12 @@
  */
 #include "audio.h"
 #include "config.h"
+#include "confwatch.h"
 #include "cue.h"
 #include "history.h"
 #include "injector.h"
 #include "input.h"
+#include "live.h"
 #include "log.h"
 #include "queue.h"
 #include "transcribe.h"
@@ -39,6 +41,25 @@ static void on_hold(bool holding, void *user)
     cue_play(holding ? CUE_START : CUE_STOP);
 }
 
+/* Puts `text` on screen, or takes the preview back when there is none.
+ *
+ * Every way an utterance can end comes through here, including the ways that
+ * produce nothing: a rejected utterance, a failed decode, a transcript of
+ * nothing but spaces. The live preview has usually typed something by then, and
+ * the only way to be sure none of those paths leaves stale words behind is to
+ * give them all the same exit. */
+static void deliver(const char *text)
+{
+    if (live_active()) {
+        live_commit(text);                  /* retracts the preview first */
+        return;
+    }
+    if (!print_only && *text && injector_send(inj, text, NULL) < 0) {
+        log_err("injection failed\n");
+        cue_play(CUE_ERROR);
+    }
+}
+
 static void *worker(void *arg)
 {
     (void)arg;
@@ -47,10 +68,20 @@ static void *worker(void *arg)
         if (!b)
             return NULL;                /* queue closed: shutting down */
 
+        /* The capture thread already decided there was nothing here. It could
+         * not retract the preview itself without blocking the audio mainloop,
+         * so it said so and left it to us. */
+        if (b->rejected) {
+            pcm_buffer_free(b);
+            deliver("");
+            continue;
+        }
+
         char *text = transcribe_pcm(b->samples, b->n_samples);
         pcm_buffer_free(b);
         if (!text) {
             cue_play(CUE_ERROR);            /* network or endpoint failure */
+            deliver("");
             continue;
         }
 
@@ -64,13 +95,10 @@ static void *worker(void *arg)
             /* Recorded before injection so a failing backend still leaves the
              * transcript somewhere the user can get at it. */
             history_append(start);
-            if (!print_only && injector_send(inj, start) < 0) {
-                log_err("injection failed\n");
-                cue_play(CUE_ERROR);
-            }
         } else {
             cue_play(CUE_ERROR);            /* nothing was recognised */
         }
+        deliver(start);
         free(text);
     }
 }
@@ -84,6 +112,17 @@ static void on_signal(int sig)
     if (sig == SIGHUP)
         reload_requested = 1;
     input_stop();                       /* write() is async-signal-safe */
+}
+
+/* Runs on the config watcher's thread when config.ini changes on disk. Does
+ * exactly what the SIGHUP handler does, and for the same reason: the work of
+ * reloading belongs on the main thread, which is sitting in epoll_wait until
+ * input_stop() writes to the eventfd that wakes it. */
+static void on_config_changed(void)
+{
+    log_info("config changed on disk, reloading\n");
+    reload_requested = 1;
+    input_stop();
 }
 
 static void usage(void)
@@ -107,7 +146,7 @@ static int run_say(const config *cfg, const char *text)
     injector *i = injector_init(cfg);
     if (!i)
         return 1;
-    int rc = injector_send(i, text) < 0 ? 1 : 0;
+    int rc = injector_send(i, text, NULL) < 0 ? 1 : 0;
     injector_destroy(i);
     return rc;
 }
@@ -152,6 +191,12 @@ int main(int argc, char **argv)
     config cfg;
     if (config_load(&cfg, cfg_path) < 0)
         return 1;
+
+    /* Resolved once, here, rather than recomputed by the watcher: the two must
+     * agree on which file matters, and only config.c knows where the default
+     * lives. */
+    char config_path[512];
+    config_resolve_path(config_path, sizeof(config_path), cfg_path);
 
     /* Both of these are diagnostics: they must work before the daemon does. */
     if (list_sources)
@@ -200,6 +245,10 @@ int main(int argc, char **argv)
             inj = injector_init(&cfg);
             if (!inj)
                 goto out;
+            /* After the injector, because it asks whether that backend can
+             * erase; before audio_init, because the capture callback starts
+             * calling live_feed the moment the stream opens. */
+            live_init(&cfg, inj);
         }
 
         if (input_init(&cfg, on_hold, NULL) < 0)
@@ -207,6 +256,11 @@ int main(int argc, char **argv)
 
         if (audio_init(&cfg, jobs) < 0)
             goto out;
+
+        /* Started last, so a change arriving mid-startup cannot ask for a
+         * reload of a stack that is not up yet. Failing is not fatal: SIGHUP
+         * still works, and confwatch_init says so. */
+        confwatch_init(config_path, on_config_changed);
 
         if (pthread_create(&worker_thread, NULL, worker, NULL) != 0) {
             log_err("cannot start worker thread\n");
@@ -223,17 +277,28 @@ int main(int argc, char **argv)
         log_info("ready; hold %s to talk\n", hotkey);
         rc = input_run() < 0 ? 1 : 0;
 
-        /* input_run returns for either reason; the flag says which. */
+        /* input_run returns for either reason; the flag says which. Two things
+         * set that flag now -- a SIGHUP and the file watcher -- and the watcher
+         * has already said so, so naming SIGHUP here would be a guess and half
+         * the time a wrong one. */
         reloading = reload_requested != 0;
-        log_info("%s\n", reloading ? "SIGHUP: reloading configuration"
+        log_info("%s\n", reloading ? "reloading configuration"
                                    : "shutting down");
 
     out:
+        /* First, so a save landing during teardown cannot set the reload flag
+         * after we have read it. */
+        confwatch_shutdown();
         audio_shutdown();
         if (jobs)
             queue_close(jobs);
         if (worker_started)
             pthread_join(worker_thread, NULL);
+        /* After the worker, which is the only thing that commits, and after
+         * audio_shutdown, which is the only thing that feeds. Before the
+         * injector is destroyed, because taking a leftover preview back is the
+         * last thing it does. */
+        live_shutdown();
         input_shutdown();
         injector_destroy(inj);
         history_shutdown();

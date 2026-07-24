@@ -275,13 +275,15 @@ static uint32_t next_codepoint(const unsigned char **p)
     return cp;
 }
 
-static int ul_send(void *vctx, const char *utf8)
+static int ul_send(void *vctx, const char *utf8, size_t *typed)
 {
     layout_ctx *c = vctx;
     const unsigned char *p = (const unsigned char *)utf8;
 
     size_t skipped = 0;
     uint32_t first_skipped = 0;
+
+    *typed = 0;
 
     for (uint32_t cp; (cp = next_codepoint(&p)) != 0; ) {
         const keystroke *k = lookup(c, cp);
@@ -296,6 +298,7 @@ static int ul_send(void *vctx, const char *utf8)
                                                     k->mods[2], k->mods[3] },
                              k->n_mods) < 0)
             return -1;
+        (*typed)++;
         if (KEY_DELAY_MS)
             nanosleep(&(struct timespec){ .tv_nsec = KEY_DELAY_MS * 1000L * 1000 },
                       NULL);
@@ -319,6 +322,10 @@ static void ul_destroy(void *vctx)
 
 const inject_backend backend_uinput_layout = {
     .name    = "uinput",
+    /* U+0008 resolves to KEY_BACKSPACE through the ordinary layout walk in
+     * build_map, so erasing needs no code of its own. tests/test_layout.c pins
+     * that, since the whole retraction path rests on it. */
+    .erases  = true,
     .probe   = ul_probe,
     .init    = ul_init,
     .send    = ul_send,

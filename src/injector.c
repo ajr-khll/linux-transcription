@@ -88,11 +88,66 @@ injector *injector_init(const config *cfg)
     return NULL;
 }
 
-int injector_send(injector *inj, const char *utf8_text)
+size_t injector_utf8_len(const char *utf8)
 {
+    size_t n = 0;
+    for (const unsigned char *p = (const unsigned char *)utf8; *p; p++)
+        if ((*p & 0xC0) != 0x80)
+            n++;
+    return n;
+}
+
+int injector_send(injector *inj, const char *utf8_text, size_t *typed)
+{
+    if (typed)
+        *typed = 0;
     if (!inj || !utf8_text || !*utf8_text)
         return 0;
-    return inj->be->send(inj->ctx, utf8_text);
+
+    size_t n = 0;
+    int rc = inj->be->send(inj->ctx, utf8_text, &n);
+    if (typed)
+        *typed = n;
+    return rc;
+}
+
+bool injector_can_erase(const injector *inj)
+{
+    return inj && inj->be && inj->be->erases;
+}
+
+int injector_erase(injector *inj, size_t n_codepoints)
+{
+    if (!inj || n_codepoints == 0)
+        return 0;
+    if (!inj->be->erases) {
+        log_err("backend '%s' cannot erase\n", inj->be->name);
+        return -1;
+    }
+
+    /* U+0008 needs no special case in either typing backend: xkbcommon reports
+     * XKB_KEY_BackSpace as that codepoint, so the uinput backend already found
+     * KEY_BACKSPACE while walking the layout, and the wlr-vk backend puts the
+     * keysym straight into the keymap it builds per send. */
+    while (n_codepoints > 0) {
+        char buf[65];
+        size_t take = n_codepoints < sizeof(buf) - 1 ? n_codepoints : sizeof(buf) - 1;
+        memset(buf, '\b', take);
+        buf[take] = '\0';
+
+        size_t erased = 0;
+        int rc = inj->be->send(inj->ctx, buf, &erased);
+        /* A short erase is worse than a failed one: the caller's idea of what
+         * is on screen is now wrong, and erasing again would eat the user's own
+         * text. Say so and let it stop. */
+        if (rc < 0 || erased != take) {
+            log_err("erased %zu of %zu character(s); giving up on the rest\n",
+                    erased, take);
+            return -1;
+        }
+        n_codepoints -= take;
+    }
+    return 0;
 }
 
 void injector_destroy(injector *inj)

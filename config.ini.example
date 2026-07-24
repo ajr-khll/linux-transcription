@@ -22,6 +22,34 @@ model_dir =
 # machine over. Raise it if transcripts lag; lower it on a small laptop.
 threads = 0
 
+# --- live preview ---
+# Off by default. Type words into the focused window as you speak them, rather
+# than waiting for the whole utterance. What appears while you hold the key
+# comes from a small streaming model and is a guess; when you let go, scribe
+# backspaces over it and types what Parakeet actually heard. The transcript you
+# keep is the same either way -- this only changes when you see it.
+#
+# Worth knowing before you turn it on: the preview has no punctuation and gets
+# words wrong, and you watch it correct itself in your own document. Some people
+# like seeing the machine keep up; others find it distracting. Try it before
+# leaving it on.
+#
+# It runs only where all four hold, and says in the log which one failed:
+#   - a hotkey that is not a modifier. This one bites: the preview types while
+#     you are still holding the key, so a hotkey of KEY_RIGHTCTRL (the default)
+#     would send Ctrl+V, Ctrl+W, Ctrl+Q into whatever window has focus instead
+#     of letters. Pick a spare key -- KEY_F13, KEY_SCROLLLOCK, or anything you
+#     do not otherwise type.
+#   - engine = parakeet. There is no live path to a network endpoint.
+#   - an injection backend that can erase, so wlr-vk or uinput. The clipboard
+#     backend pastes rather than types and cannot take anything back.
+#   - the streaming model installed, which install-parakeet.sh fetches.
+# Anywhere else scribe falls back to typing the transcript in one go.
+live = off
+# Where the streaming model lives. Empty = where install-parakeet.sh puts it,
+# /usr/local/share/scribe/models/streaming-zipformer-en.
+live_model_dir =
+
 # --- openai ---
 # Required when engine = openai; ignored otherwise. scribe will not start
 # without a key. Get one at https://platform.openai.com/api-keys

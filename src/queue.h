@@ -10,12 +10,22 @@
 #ifndef SCRIBE_QUEUE_H
 #define SCRIBE_QUEUE_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 typedef struct {
     int16_t *samples;
     size_t   n_samples;
+
+    /* The utterance ended without anything worth transcribing -- too short, or
+     * no speech in it. `samples` is NULL and nothing will be decoded.
+     *
+     * It still has to travel down the queue rather than being dropped where it
+     * was judged, because the live preview may already have typed words for it
+     * and only the worker retracts them. Judging happens on the capture thread,
+     * which must not block; the worker can. */
+    bool     rejected;
 } pcm_buffer;
 
 void pcm_buffer_free(pcm_buffer *b);

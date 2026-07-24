@@ -20,6 +20,7 @@
 
 #include "audio.h"
 #include "cue.h"
+#include "live.h"
 #include "log.h"
 #include "vad.h"
 
@@ -111,11 +112,31 @@ static void utt_begin(void)
     }
 }
 
+/* Tells the worker an utterance ended with nothing to transcribe.
+ *
+ * Nothing has to be decoded, so this looks like wasted work -- but the live
+ * preview may already have typed words for it, and the worker is the only place
+ * that takes them back. Judging happens here, on the PulseAudio mainloop, which
+ * must not block; retracting means keystrokes, which do. So the verdict travels
+ * down the queue and the worker acts on it. */
+static void push_rejected(void)
+{
+    if (!live_active())
+        return;                             /* nothing was typed; nothing to undo */
+
+    pcm_buffer *b = calloc(1, sizeof(*b));
+    if (!b)
+        return;
+    b->rejected = true;
+    queue_push(out_queue, b);
+}
+
 static void utt_seal(void)
 {
     if (utt_n < AUDIO_RATE / 10) {          /* < 100 ms: a stray tap */
         log_dbg("utterance too short (%zu samples), discarded\n", utt_n);
         utt_n = 0;
+        push_rejected();
         return;
     }
 
@@ -142,17 +163,24 @@ static void utt_seal(void)
                      "(see: scribe --list-sources)\n");
         cue_play(CUE_ERROR);
         utt_n = 0;
+        push_rejected();
         return;
     }
     log_dbg("utterance peak %.1f%% of full scale, envelope spread %.1f dB\n",
             r.peak / 327.68, r.spread_db);
 
-    pcm_buffer *b = malloc(sizeof(*b));
-    if (!b)
+    /* calloc, so `rejected` is false without saying so. */
+    pcm_buffer *b = calloc(1, sizeof(*b));
+    if (!b) {
+        utt_n = 0;
+        push_rejected();
         return;
+    }
     b->samples = malloc(utt_n * sizeof(int16_t));
     if (!b->samples) {
         free(b);
+        utt_n = 0;
+        push_rejected();
         return;
     }
     memcpy(b->samples, utt, utt_n * sizeof(int16_t));
@@ -168,12 +196,24 @@ static void utt_seal(void)
 static void feed_chunk(const int16_t *s, size_t n)
 {
     bool now = atomic_load(&capturing);
-    if (now && !was_capturing)
+    if (now && !was_capturing) {
         utt_begin();
-    if (now)
+        live_begin();
+        /* utt_begin has just seeded the utterance with the preroll, so this
+         * hands the preview the same opening the transcriber will get. Without
+         * it the preview would start a quarter-second in and lose the first
+         * consonant, which is the one thing the preroll exists to save. */
+        live_feed(utt, utt_n);
+    }
+    if (now) {
         utt_append(s, n);
-    else if (was_capturing)
+        live_feed(s, n);
+    } else if (was_capturing) {
+        /* Closed before sealing, so the preview thread can start flushing its
+         * tail while the transcriber is still working on the same audio. */
+        live_close();
         utt_seal();
+    }
 
     preroll_write(s, n);
     was_capturing = now;

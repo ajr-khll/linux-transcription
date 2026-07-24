@@ -24,6 +24,9 @@ WITH_PARAKEET ?= 0
 SHERPA_PREFIX ?= $(PREFIX)/lib/scribe
 SHERPA_INCLUDE ?= third_party/sherpa-onnx/include
 PARAKEET_MODEL_DIR ?= $(PREFIX)/share/scribe/models/parakeet-tdt-0.6b-v3-int8
+# The live preview's streaming model. Shares WITH_PARAKEET because it is the
+# same sherpa-onnx library; install-parakeet.sh fetches both.
+LIVE_MODEL_DIR ?= $(PREFIX)/share/scribe/models/streaming-zipformer-en
 
 # `clean` and `uninstall` compile nothing, so nothing under $(BUILD) should be
 # written for them -- and `./uninstall.sh` runs `sudo make uninstall`. On a tree
@@ -61,7 +64,8 @@ LDLIBS      += -lpthread -lm
 SRC := src/main.c src/config.c src/input.c src/audio.c \
        src/transcribe.c src/asr_openai.c \
        src/json_text.c src/queue.c src/uinput_kbd.c src/injector.c \
-       src/history.c src/cue.c src/vad.c src/backends/clipboard.c
+       src/history.c src/cue.c src/vad.c src/live.c src/confwatch.c \
+       src/backends/clipboard.c
 
 PROTO_XML   := protocol/virtual-keyboard-unstable-v1.xml
 PROTO_H     := $(BUILD)/virtual-keyboard-unstable-v1-client-protocol.h
@@ -82,8 +86,9 @@ endif
 
 ifeq ($(WITH_PARAKEET),1)
   CFLAGS += -DWITH_PARAKEET -I$(SHERPA_INCLUDE) \
-            -DSCRIBE_MODEL_DIR='"$(PARAKEET_MODEL_DIR)"'
-  SRC    += src/asr_parakeet.c
+            -DSCRIBE_MODEL_DIR='"$(PARAKEET_MODEL_DIR)"' \
+            -DSCRIBE_LIVE_MODEL_DIR='"$(LIVE_MODEL_DIR)"'
+  SRC    += src/asr_parakeet.c src/asr_stream.c
   # sherpa-onnx is not packaged by any distribution and has no .pc file, so
   # there is nothing for pkg-config to find. rpath rather than ldconfig: the
   # library is ours, it lives under our own prefix, and a global search path
@@ -119,7 +124,7 @@ ifneq ($(BUILD_FLAGS),$(PREV_FLAGS))
 endif
 endif
 
-.PHONY: all clean install uninstall test test-parakeet
+.PHONY: all clean install uninstall test test-parakeet test-stream
 
 all: $(BUILD)/scribe
 
@@ -137,10 +142,12 @@ test: $(PROTO_H) $(PROTO_C)
 	$(CC) $(TEST_CFLAGS) -DWITH_WLR_VK tests/test_keymap.c $(PROTO_C) $(TEST_LIBS) -o $(BUILD)/test_keymap
 	$(CC) $(TEST_CFLAGS) -DWITH_UINPUT_LAYOUT tests/test_layout.c src/uinput_kbd.c src/config.c $(TEST_LIBS) $(shell pkg-config --libs libevdev) -o $(BUILD)/test_layout
 	$(CC) $(TEST_CFLAGS) tests/test_vad.c src/vad.c -lm -o $(BUILD)/test_vad
+	$(CC) $(TEST_CFLAGS) tests/test_live.c src/config.c $(shell pkg-config --libs libevdev) -lpthread -o $(BUILD)/test_live
 	@echo "--- json ---"   && $(BUILD)/test_json
 	@echo "--- keymap ---" && $(BUILD)/test_keymap
 	@echo "--- layout ---" && $(BUILD)/test_layout
 	@echo "--- vad ---"    && $(BUILD)/test_vad
+	@echo "--- live ---"   && $(BUILD)/test_live
 
 # Separate from `test` on purpose: it needs a 640 MB model and a library that
 # a plain checkout does not have. Pass a WAV to run it -- install-parakeet.sh
@@ -153,6 +160,18 @@ test-parakeet:
 	    -L$(SHERPA_PREFIX) -lsherpa-onnx-c-api -Wl,-rpath,$(PREFIX)/lib/scribe \
 	    $(shell pkg-config --libs libevdev) -o $(BUILD)/test_parakeet
 	@echo "run: $(BUILD)/test_parakeet $(PARAKEET_MODEL_DIR)/test.wav"
+
+# The live engine, same deal. Reports how often the streaming model revises
+# text it already emitted, which is what decides whether live mode is bearable:
+# every revision is backspaces sent to whatever window has focus.
+test-stream:
+	@mkdir -p $(BUILD)
+	$(CC) $(TEST_CFLAGS) -DWITH_PARAKEET -I$(SHERPA_INCLUDE) \
+	    -DSCRIBE_LIVE_MODEL_DIR='"$(LIVE_MODEL_DIR)"' \
+	    tests/test_stream.c src/asr_stream.c src/config.c \
+	    -L$(SHERPA_PREFIX) -lsherpa-onnx-c-api -Wl,-rpath,$(PREFIX)/lib/scribe \
+	    $(shell pkg-config --libs libevdev) -o $(BUILD)/test_stream
+	@echo "run: $(BUILD)/test_stream $(LIVE_MODEL_DIR)/test.wav"
 
 $(BUILD)/scribe: $(OBJ)
 	$(CC) $(OBJ) $(LDFLAGS) $(LDLIBS) -o $@

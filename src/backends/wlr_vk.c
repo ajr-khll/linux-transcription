@@ -133,6 +133,10 @@ static xkb_keysym_t keysym_for(uint32_t cp)
     switch (cp) {
     case '\n': return XKB_KEY_Return;
     case '\t': return XKB_KEY_Tab;
+    /* Live mode retracts a preview by typing these. Without the case,
+     * xkb_utf32_to_keysym(8) returns NoSymbol and the Unicode fallback below
+     * builds a keysym no compositor recognises as an erase. */
+    case '\b': return XKB_KEY_BackSpace;
     default:   break;
     }
     xkb_keysym_t ks = xkb_utf32_to_keysym(cp);
@@ -254,9 +258,11 @@ static size_t index_of(const uint32_t *a, size_t n, uint32_t v)
     return (size_t)-1;
 }
 
-static int vk_send(void *vctx, const char *utf8)
+static int vk_send(void *vctx, const char *utf8, size_t *typed)
 {
     vk_ctx *c = vctx;
+
+    *typed = 0;
 
     size_t n_cps;
     uint32_t *cps = utf8_decode(utf8, &n_cps);
@@ -284,6 +290,10 @@ static int vk_send(void *vctx, const char *utf8)
         }
         for (size_t k = i; k < j; k++)
             tap(c, (uint32_t)(index_of(distinct, nd, cps[k]) + 1));
+        /* Counted per batch rather than at the end: a later keymap upload can
+         * fail, and everything tapped before that point is already on screen
+         * and still has to be accounted for. */
+        *typed += j - i;
 
         i = j;
     }
@@ -333,6 +343,7 @@ static void vk_destroy(void *vctx)
 
 const inject_backend backend_wlr_vk = {
     .name    = "wlr-vk",
+    .erases  = true,
     .probe   = vk_probe,
     .init    = vk_init,
     .send    = vk_send,

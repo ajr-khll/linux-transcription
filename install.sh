@@ -24,7 +24,7 @@ usage: ./install.sh [options]
 Installs scribe: build dependencies, the daemon, the settings panel, the input
 group, your config and the systemd user service.
 
-  --engine=local     transcribe on this machine. Parakeet, ~490 MB download,
+  --engine=local     transcribe on this machine. Parakeet, ~560 MB download,
                      no account and nothing leaves the computer. The default.
   --engine=cloud     transcribe via OpenAI. Needs an API key, and every
                      utterance is uploaded.
@@ -202,7 +202,7 @@ elif [ "$CONFIGURED_ENGINE" = parakeet ] || [ "$CONFIGURED_ENGINE" = openai ]; t
 elif asking; then
     cat <<'EOF'
     1) local   Parakeet runs on this machine. No account, no key, no bill,
-               and nothing you dictate leaves the computer. Costs a 490 MB
+               and nothing you dictate leaves the computer. Costs a 560 MB
                download, about 1 GB of memory while running, and covers 25
                European languages.
     2) cloud   OpenAI Whisper. Needs an API key and a card on file, and
@@ -261,7 +261,7 @@ if [ "$SKIP_DEPS" -eq 0 ]; then
     echo "    $STEP. install build dependencies (root)"; STEP=$((STEP + 1))
 fi
 if [ "$ENGINE" = parakeet ]; then
-    echo "    $STEP. download the local engine, ~490 MB, to $PREFIX/share/scribe (root)"
+    echo "    $STEP. download the local engine, ~560 MB, to $PREFIX/share/scribe (root)"
     STEP=$((STEP + 1))
 fi
 echo "    $STEP. build scribe and run its tests"; STEP=$((STEP + 1))

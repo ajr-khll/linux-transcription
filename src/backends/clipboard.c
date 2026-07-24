@@ -120,9 +120,11 @@ static void *clip_init(const config *cfg)
     return ctx;
 }
 
-static int clip_send(void *vctx, const char *utf8)
+static int clip_send(void *vctx, const char *utf8, size_t *typed)
 {
     clip_ctx *ctx = vctx;
+
+    *typed = 0;
 
     int rc;
     if (ctx->wayland) {
@@ -138,8 +140,14 @@ static int clip_send(void *vctx, const char *utf8)
     /* Give the selection owner a moment to be ready to serve the paste. */
     nanosleep(&(struct timespec){ .tv_nsec = 60L * 1000 * 1000 }, NULL);
 
-    return uinput_kbd_chord(ctx->cfg->paste_key, ctx->cfg->paste_mods,
-                            ctx->cfg->n_paste_mods);
+    if (uinput_kbd_chord(ctx->cfg->paste_key, ctx->cfg->paste_mods,
+                         ctx->cfg->n_paste_mods) < 0)
+        return -1;
+
+    /* The clipboard carries real UTF-8, so a paste that went through delivered
+     * every character. Nothing here can drop one the way a layout can. */
+    *typed = injector_utf8_len(utf8);
+    return 0;
 }
 
 static void clip_destroy(void *vctx)
@@ -150,6 +158,10 @@ static void clip_destroy(void *vctx)
 
 const inject_backend backend_clipboard = {
     .name    = "clipboard",
+    /* It pastes rather than types, so there is nothing to take back: a U+0008
+     * on the clipboard is a control character, not an erase. Live mode checks
+     * this and stays off. */
+    .erases  = false,
     .probe   = clip_probe,
     .init    = clip_init,
     .send    = clip_send,
