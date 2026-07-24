@@ -12,23 +12,19 @@
  * Three threads meet here and only one of them types. The capture thread pushes
  * samples in and never blocks, because it is the PulseAudio mainloop and a
  * stall there costs dropped audio. The worker thread hands over the finished
- * transcript and waits. This thread owns the decoding stream, the injector and
- * the record of what is on screen, and does every keystroke itself -- which is
- * the whole reason the other two do not touch the injector at all.
+ * transcript and waits. This thread owns the decoding stream and does every
+ * keystroke itself -- which is the whole reason the other two do not touch the
+ * injector at all.
  *
- * What is on screen is tracked two ways, because one of them is not enough.
- * `shown` is the text we believe we typed, and drives the diff that keeps the
- * retraction short. `typed` is how many codepoints actually landed, counted
- * from what the backend reports. They disagree when a backend drops characters
- * it cannot produce -- the uinput layout does this for curly quotes and em
- * dashes -- and when they disagree the count is the one to trust, because it is
- * measured rather than assumed. Erasing by the wrong number does not leave a
- * mess on screen; it eats the user's own text to the left of the caret.
+ * What is on screen, and the diff that keeps each retraction short, lives in
+ * screen.c. This thread is its sole caller while the preview runs; the worker
+ * thread is when it does not. The two paths never overlap.
  */
 #include "live.h"
 #include "asr.h"
 #include "audio.h"
 #include "log.h"
+#include "screen.h"
 
 #include <pthread.h>
 #include <stdlib.h>
@@ -49,7 +45,7 @@ enum state {
     ST_CLOSING,                             /* key up, ring still draining */
 };
 
-static injector *inj;
+static injector *inj;                       /* borrowed, for screen_attach */
 static bool      running;                   /* live_init said yes */
 
 static pthread_t       thread;
@@ -61,91 +57,26 @@ static enum state state;
 static bool  quitting;
 static bool  begin_pending;
 
-/* One slot, and that is safe: only the worker thread commits, and it waits for
- * the swap before returning, so a second can never arrive while one is here. */
-static char *commit_text;
-static bool  commit_pending;
+/* One slot, and that is safe: only the worker thread hands text over, and it
+ * waits for the swap before returning, so a second can never arrive while one
+ * is here. The op is either a stage (put text on screen, keep owning it) or a
+ * commit (put it on screen and hand it to the user). */
+static char    *commit_text;
+static bool     commit_pending;
+static bool     commit_release;         /* commit hands the text over; stage does not */
+static bool     commit_check_gen;       /* a staged correction: drop it if stale */
+static unsigned commit_gen;             /* the generation the correction belongs to */
+
+/* Bumped on every live_begin. A cleanup correction computed for one utterance
+ * must not land on screen after the next utterance's preview has started -- it
+ * would erase words it never typed. The worker stamps each correction with the
+ * generation it staged under; a mismatch here means the user moved on, so the
+ * raw transcript already on screen stands and the correction is dropped. */
+static unsigned generation;
 
 static int16_t *ring;
 static size_t   ring_head, ring_tail, ring_count;
 static bool     overran;
-
-/* Touched only by the preview thread. */
-static char  *shown;                        /* what we think we typed */
-static size_t typed;                        /* codepoints that really landed */
-static bool   synced;                       /* do the two above agree? */
-
-/* ---- what is on screen ------------------------------------------------- */
-
-/* Bytes the two share, backed off to a codepoint boundary so a retraction can
- * never cut a multi-byte character in half. */
-static size_t common_prefix(const char *a, const char *b)
-{
-    size_t i = 0;
-    while (a[i] && a[i] == b[i])
-        i++;
-    /* Walk back off any continuation bytes: the first differing byte may be the
-     * middle of a character whose earlier bytes matched. */
-    while (i > 0 && ((unsigned char)a[i] & 0xC0) == 0x80)
-        i--;
-    return i;
-}
-
-/* Erases everything we put on screen and forgets what it was. Used when the
- * two records disagree: the count is still right, the text is not, so the only
- * honest move is to clear the ground and start again. */
-static void resync(void)
-{
-    if (typed > 0 && injector_erase(inj, typed) < 0)
-        log_warn("live: could not clear the preview; leaving it alone\n");
-    typed = 0;
-    free(shown);
-    shown = strdup("");
-    synced = true;
-}
-
-/* Moves the screen from `shown` to `want`, erasing only the tail they do not
- * share. Returns with `shown` equal to `want` when it worked. */
-static void render(const char *want)
-{
-    if (!synced)
-        resync();
-
-    size_t keep = common_prefix(shown, want);
-
-    size_t drop = injector_utf8_len(shown + keep);
-    if (drop > 0) {
-        if (injector_erase(inj, drop) < 0) {
-            synced = false;
-            return;
-        }
-        typed -= drop;
-    }
-
-    const char *tail = want + keep;
-    if (*tail) {
-        size_t landed = 0;
-        int rc = injector_send(inj, tail, &landed);
-        typed += landed;
-        if (rc < 0 || landed != injector_utf8_len(tail)) {
-            /* Either the send failed part-way or the backend could not produce
-             * some characters. Both leave us unable to say what is on screen,
-             * so mark it and let the next render clear up. */
-            synced = false;
-            log_dbg("live: typed %zu of %zu, preview out of step\n",
-                    landed, injector_utf8_len(tail));
-            return;
-        }
-    }
-
-    char *copy = strdup(want);
-    if (copy) {
-        free(shown);
-        shown = copy;
-    } else {
-        synced = false;
-    }
-}
 
 /* ---- the ring ---------------------------------------------------------- */
 
@@ -165,7 +96,7 @@ static void decode_chunk(const int16_t *s, size_t n)
     char *text = asr_stream_feed(s, n);
     if (!text)
         return;                             /* no new words, the common case */
-    render(text);
+    screen_render(text);
     free(text);
 }
 
@@ -175,24 +106,9 @@ static void finish_stream(void)
 {
     char *text = asr_stream_end();
     if (text) {
-        render(text);
+        screen_render(text);
         free(text);
     }
-}
-
-/* Swaps the preview for the finished transcript, then forgets both. Forgetting
- * is the point: once this returns the text belongs to the user's document, and
- * the next utterance must not try to erase it. */
-static void apply_commit(const char *final_text)
-{
-    if (!synced)
-        resync();
-    render(final_text);
-
-    free(shown);
-    shown = strdup("");
-    typed = 0;
-    synced = true;
 }
 
 static void *live_thread(void *arg)
@@ -218,9 +134,20 @@ static void *live_thread(void *arg)
         if (commit_pending) {
             char *text = commit_text;
             commit_text = NULL;
+            bool release = commit_release;
+            /* A staged correction is stale when a newer utterance has begun
+             * since it was staged. generation is only written under this lock,
+             * so read it here while we hold it. */
+            bool stale = commit_check_gen && commit_gen != generation;
             pthread_mutex_unlock(&lock);
 
-            apply_commit(text ? text : "");
+            if (stale) {
+                log_dbg("live: dropping a stale correction; the raw text stands\n");
+            } else {
+                screen_render(text ? text : "");
+                if (release)
+                    screen_release();
+            }
             free(text);
 
             pthread_mutex_lock(&lock);
@@ -238,6 +165,12 @@ static void *live_thread(void *arg)
         if (begin_pending) {
             begin_pending = false;
             pthread_mutex_unlock(&lock);
+
+            /* Anything a prior utterance staged and never committed is the
+             * user's now: forget it, so this utterance's preview types fresh
+             * text rather than diffing against the last one's transcript. In
+             * the common case nothing is owned and this does nothing. */
+            screen_release();
 
             if (asr_stream_begin() < 0)
                 log_warn("live: no preview for this utterance\n");
@@ -326,30 +259,24 @@ bool live_init(const config *cfg, injector *injector_in)
     }
 
     ring = malloc(RING_SAMPLES * sizeof(*ring));
-    shown = strdup("");
-    if (!ring || !shown) {
+    if (!ring) {
         log_err("live: out of memory\n");
-        free(ring);
-        free(shown);
-        ring = NULL;
-        shown = NULL;
         return false;
     }
 
     inj = injector_in;
+    screen_attach(inj);
     state = ST_IDLE;
     quitting = false;
     begin_pending = commit_pending = false;
-    typed = 0;
-    synced = true;
+    generation = 0;
     ring_reset();
 
     if (pthread_create(&thread, NULL, live_thread, NULL) != 0) {
         log_err("live: cannot start the preview thread\n");
+        screen_detach();
         free(ring);
-        free(shown);
         ring = NULL;
-        shown = NULL;
         inj = NULL;
         return false;
     }
@@ -377,6 +304,9 @@ void live_begin(void)
     ring_reset();
     state = ST_RUNNING;
     begin_pending = true;
+    /* A new utterance: any correction the worker is still computing for the
+     * last one is now stale. See the note on `generation`. */
+    generation++;
     pthread_cond_signal(&wake);
     pthread_mutex_unlock(&lock);
 }
@@ -421,29 +351,64 @@ void live_close(void)
     pthread_mutex_unlock(&lock);
 }
 
+/* Hands `text` to the preview thread and waits until it is on screen. `release`
+ * decides whether the text becomes the user's afterwards; `check_gen`, whether a
+ * newer utterance since `gen` should cause it to be dropped. Returns the
+ * generation the handoff was stamped with. Waiting is what makes the preview
+ * thread the only one that types: the worker has nothing else to do meanwhile,
+ * so the cost is the keystrokes themselves. */
+static unsigned handoff(const char *text, bool release, bool check_gen, unsigned gen)
+{
+    char *copy = strdup(text ? text : "");
+    if (!copy) {
+        log_err("live: out of memory handing over a transcript\n");
+        return gen;
+    }
+
+    pthread_mutex_lock(&lock);
+    unsigned now = generation;
+    free(commit_text);
+    commit_text = copy;
+    commit_release = release;
+    commit_check_gen = check_gen;
+    commit_gen = gen;
+    commit_pending = true;
+    pthread_cond_signal(&wake);
+
+    while (commit_pending && !quitting)
+        pthread_cond_wait(&done, &lock);
+    pthread_mutex_unlock(&lock);
+    return now;
+}
+
+/* Puts `text` on screen and keeps owning it, so a later stage or commit can
+ * replace just the tail that changed. Returns the generation to stamp the
+ * matching commit with. */
+unsigned live_stage(const char *text)
+{
+    if (!running)
+        return 0;
+    return handoff(text, false, false, 0);
+}
+
+/* Replaces the staged text with the finished one and hands it to the user --
+ * unless a newer utterance has begun since `gen`, in which case the raw text
+ * already on screen stands and this is dropped. */
+void live_commit_staged(const char *final_text, unsigned gen)
+{
+    if (!running)
+        return;
+    handoff(final_text, true, true, gen);
+}
+
+/* Puts `final_text` on screen and hands it to the user, unconditionally. The
+ * path with no cleanup pass, and the retraction of a preview that produced
+ * nothing. */
 void live_commit(const char *final_text)
 {
     if (!running)
         return;
-
-    char *copy = strdup(final_text ? final_text : "");
-    if (!copy) {
-        log_err("live: out of memory committing a transcript\n");
-        return;
-    }
-
-    pthread_mutex_lock(&lock);
-    free(commit_text);
-    commit_text = copy;
-    commit_pending = true;
-    pthread_cond_signal(&wake);
-
-    /* Waiting is what makes this thread the only one that types. The worker has
-     * just finished decoding and has nothing else to do, so the cost is the
-     * keystrokes themselves. */
-    while (commit_pending && !quitting)
-        pthread_cond_wait(&done, &lock);
-    pthread_mutex_unlock(&lock);
+    handoff(final_text, true, false, 0);
 }
 
 void live_shutdown(void)
@@ -460,18 +425,14 @@ void live_shutdown(void)
     pthread_join(thread, NULL);
 
     /* A preview still on screen when the daemon goes down is text the user
-     * never asked for and cannot account for. Take it back. */
-    if (typed > 0)
-        injector_erase(inj, typed);
+     * never asked for and cannot account for. screen_detach takes it back. */
+    screen_detach();
 
     free(ring);
-    free(shown);
     free(commit_text);
     ring = NULL;
-    shown = NULL;
     commit_text = NULL;
     inj = NULL;
-    typed = 0;
     running = false;
 
     /* Empty by design, exactly as the other engines' shutdowns are: a SIGHUP

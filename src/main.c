@@ -16,7 +16,9 @@
 #include "input.h"
 #include "live.h"
 #include "log.h"
+#include "polish.h"
 #include "queue.h"
+#include "screen.h"
 #include "transcribe.h"
 
 #include <getopt.h>
@@ -31,6 +33,13 @@
 static queue    *jobs;
 static injector *inj;
 static bool      print_only;
+
+/* True when the worker itself drives the screen record, so it can put the raw
+ * transcript up and then swap the cleaned one in. That is the cleanup path with
+ * the preview off: the preview, when it is on, owns the screen instead. Needs a
+ * backend that can erase and a transcript actually being typed, so it is off
+ * for print-only and for the clipboard. */
+static bool      worker_screen;
 
 /* Runs on the input thread, so it must not block. */
 static void on_hold(bool holding, void *user)
@@ -54,10 +63,52 @@ static void deliver(const char *text)
         live_commit(text);                  /* retracts the preview first */
         return;
     }
+    if (worker_screen) {
+        screen_render(text);                /* retracts a staged transcript */
+        screen_release();
+        return;
+    }
     if (!print_only && *text && injector_send(inj, text, NULL) < 0) {
         log_err("injection failed\n");
         cue_play(CUE_ERROR);
     }
+}
+
+/* Delivers a real transcript, cleaning it up on the way when cleanup is on: the
+ * raw text goes on screen first, then the model's corrected version replaces it
+ * when it arrives. Text is never withheld waiting on the model -- a slow or dead
+ * endpoint just leaves the raw transcript standing.
+ *
+ * The swap needs a screen to erase into. With the preview on, its thread owns
+ * that; with the preview off but an erasable backend, the worker does
+ * (worker_screen). Anywhere else -- the clipboard, print-only -- there is no
+ * swap, so the cleaned text is simply what gets delivered, once. */
+static void deliver_transcript(const char *raw)
+{
+    unsigned gen = 0;
+    if (live_active())
+        gen = live_stage(raw);              /* raw up now, kept for the swap */
+    else if (worker_screen)
+        screen_render(raw);
+
+    char *clean = polish_enabled() ? polish_text(raw) : NULL;
+    const char *final = clean ? clean : raw;
+    if (clean && strcmp(clean, raw) != 0)
+        log_info("cleaned: %s\n", clean);
+
+    if (live_active()) {
+        live_commit_staged(final, gen);     /* dropped if a newer utterance began */
+    } else if (worker_screen) {
+        screen_render(final);
+        screen_release();
+    } else if (!print_only && *final && injector_send(inj, final, NULL) < 0) {
+        log_err("injection failed\n");
+        cue_play(CUE_ERROR);
+    }
+
+    /* Recorded after the swap so the file keeps what the user was left with. */
+    history_append(final);
+    free(clean);
 }
 
 static void *worker(void *arg)
@@ -92,13 +143,11 @@ static void *worker(void *arg)
 
         if (*start) {
             log_info("transcript: %s\n", start);
-            /* Recorded before injection so a failing backend still leaves the
-             * transcript somewhere the user can get at it. */
-            history_append(start);
+            deliver_transcript(start);
         } else {
             cue_play(CUE_ERROR);            /* nothing was recognised */
+            deliver("");                    /* retract any preview */
         }
-        deliver(start);
         free(text);
     }
 }
@@ -218,6 +267,7 @@ int main(int argc, char **argv)
 
         reload_requested = 0;
         reloading = false;
+        worker_screen = false;
 
         /* Logged before anything can fail, so a permissions error still tells
          * the user which key they were meant to be holding. */
@@ -230,6 +280,11 @@ int main(int argc, char **argv)
             goto out;
 
         if (transcribe_init(&cfg) < 0)
+            goto out;
+
+        /* Refuses at startup, like the OpenAI key check, when cleanup is on but
+         * its endpoint is not local. A no-op when cleanup is off. */
+        if (polish_init(&cfg) < 0)
             goto out;
 
         /* A history directory we cannot create is worth reporting, but not
@@ -249,6 +304,15 @@ int main(int argc, char **argv)
              * erase; before audio_init, because the capture callback starts
              * calling live_feed the moment the stream opens. */
             live_init(&cfg, inj);
+
+            /* The preview owns the screen when it runs. When it does not but
+             * cleanup does, and the backend can erase, the worker owns it
+             * instead, so the raw transcript can be swapped for the cleaned one.
+             * live_init already attaches the screen in the preview case. */
+            worker_screen = !live_active() && polish_enabled() &&
+                            injector_can_erase(inj);
+            if (worker_screen)
+                screen_attach(inj);
         }
 
         if (input_init(&cfg, on_hold, NULL) < 0)
@@ -299,9 +363,15 @@ int main(int argc, char **argv)
          * injector is destroyed, because taking a leftover preview back is the
          * last thing it does. */
         live_shutdown();
+        /* When the worker owned the screen, live_shutdown left it alone; take
+         * back any transcript still standing before the injector goes away. A
+         * no-op when the preview owned it, since live_shutdown already detached. */
+        if (worker_screen)
+            screen_detach();
         input_shutdown();
         injector_destroy(inj);
         history_shutdown();
+        polish_shutdown();
         transcribe_shutdown();
         queue_destroy(jobs);
         jobs = NULL;

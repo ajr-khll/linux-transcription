@@ -26,6 +26,33 @@ static void check(const char *json, const char *want)
     free(got);
 }
 
+/* Escapes `raw`, checks it matches `want`, then decodes it back through
+ * json_extract_string and checks it round trips to the original. */
+static void check_escape(const char *raw, const char *want)
+{
+    char *got = json_escape_string(raw);
+    int ok = got && strcmp(got, want) == 0;
+    printf("%s  escape %-24s -> %s\n", ok ? "PASS" : "FAIL", raw, got ? got : "(null)");
+    if (!ok) {
+        printf("      wanted: %s\n", want);
+        fails++;
+    }
+
+    if (got) {
+        /* {"text":"<escaped>"} must decode back to raw. */
+        char obj[512];
+        snprintf(obj, sizeof(obj), "{\"text\":\"%s\"}", got);
+        char *back = json_extract_string(obj, "text");
+        int round = back && strcmp(back, raw) == 0;
+        if (!round) {
+            printf("FAIL  round trip %s -> %s\n", raw, back ? back : "(null)");
+            fails++;
+        }
+        free(back);
+    }
+    free(got);
+}
+
 int main(void)
 {
     check("{\"text\":\"hello world\"}", "hello world");
@@ -39,6 +66,14 @@ int main(void)
     check("{\"error\":{\"message\":\"nope\"}}", NULL);
     check("not json at all", NULL);
     check("{\"segments\":[{\"text\":\"nested\"}]}", "nested");
+
+    check_escape("plain", "plain");
+    check_escape("say \"hi\"", "say \\\"hi\\\"");
+    check_escape("a\\b", "a\\\\b");
+    check_escape("line\none\ttab", "line\\none\\ttab");
+    check_escape("bell\x07here", "bell\\u0007here");
+    check_escape("café", "café");           /* UTF-8 passes through */
+    check_escape("", "");
 
     printf("\n%s (%d failures)\n", fails ? "FAILED" : "all passed", fails);
     return fails != 0;

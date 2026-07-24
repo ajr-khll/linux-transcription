@@ -62,10 +62,10 @@ CFLAGS      += -MMD -MP -DSCRIBE_VERSION='"$(VERSION)"'
 LDLIBS      += -lpthread -lm
 
 SRC := src/main.c src/config.c src/input.c src/audio.c \
-       src/transcribe.c src/asr_openai.c \
+       src/transcribe.c src/asr_openai.c src/polish.c \
        src/json_text.c src/queue.c src/uinput_kbd.c src/injector.c \
-       src/history.c src/cue.c src/vad.c src/live.c src/confwatch.c \
-       src/backends/clipboard.c
+       src/history.c src/cue.c src/vad.c src/live.c src/screen.c \
+       src/confwatch.c src/backends/clipboard.c
 
 PROTO_XML   := protocol/virtual-keyboard-unstable-v1.xml
 PROTO_H     := $(BUILD)/virtual-keyboard-unstable-v1-client-protocol.h
@@ -143,11 +143,15 @@ test: $(PROTO_H) $(PROTO_C)
 	$(CC) $(TEST_CFLAGS) -DWITH_UINPUT_LAYOUT tests/test_layout.c src/uinput_kbd.c src/config.c $(TEST_LIBS) $(shell pkg-config --libs libevdev) -o $(BUILD)/test_layout
 	$(CC) $(TEST_CFLAGS) tests/test_vad.c src/vad.c -lm -o $(BUILD)/test_vad
 	$(CC) $(TEST_CFLAGS) tests/test_live.c src/config.c $(shell pkg-config --libs libevdev) -lpthread -o $(BUILD)/test_live
+	$(CC) $(TEST_CFLAGS) tests/test_screen.c src/screen.c -o $(BUILD)/test_screen
+	$(CC) $(TEST_CFLAGS) -DSCRIBE_VERSION='"$(VERSION)"' tests/test_polish.c src/polish.c src/json_text.c $(shell pkg-config --libs libcurl) -o $(BUILD)/test_polish
 	@echo "--- json ---"   && $(BUILD)/test_json
 	@echo "--- keymap ---" && $(BUILD)/test_keymap
 	@echo "--- layout ---" && $(BUILD)/test_layout
 	@echo "--- vad ---"    && $(BUILD)/test_vad
 	@echo "--- live ---"   && $(BUILD)/test_live
+	@echo "--- screen ---" && $(BUILD)/test_screen
+	@echo "--- polish ---" && $(BUILD)/test_polish
 
 # Separate from `test` on purpose: it needs a 640 MB model and a library that
 # a plain checkout does not have. Pass a WAV to run it -- install-parakeet.sh

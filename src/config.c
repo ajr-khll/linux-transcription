@@ -213,6 +213,14 @@ int config_load(config *cfg, const char *path)
      * moment later -- rougher than the one-shot behaviour, and rough in someone
      * else's document. That is a thing to opt into. */
     cfg->live = false;
+    /* Off by default, and local by default when on: the cleanup pass reads
+     * every transcript, so the endpoint stays on this machine unless the user
+     * says otherwise, and polish.c refuses one that is not. 11434 is Ollama's
+     * port; any OpenAI-compatible local server works. */
+    cfg->cleanup = false;
+    snprintf(cfg->cleanup_endpoint_url, sizeof(cfg->cleanup_endpoint_url),
+             "http://localhost:11434/v1");
+    cfg->cleanup_timeout_ms = 2500;
     cfg->paste_key = KEY_V;
     cfg->paste_mods[0] = KEY_LEFTCTRL;
     cfg->n_paste_mods = 1;
@@ -265,6 +273,17 @@ int config_load(config *cfg, const char *path)
                         strcmp(val, "yes") == 0 || strcmp(val, "1") == 0;
         } else if (strcmp(key, "live_model_dir") == 0) {
             snprintf(cfg->live_model_dir, sizeof(cfg->live_model_dir), "%s", val);
+        } else if (strcmp(key, "cleanup") == 0) {
+            cfg->cleanup = strcmp(val, "on") == 0 || strcmp(val, "true") == 0 ||
+                           strcmp(val, "yes") == 0 || strcmp(val, "1") == 0;
+        } else if (strcmp(key, "cleanup_endpoint_url") == 0) {
+            snprintf(cfg->cleanup_endpoint_url, sizeof(cfg->cleanup_endpoint_url), "%s", val);
+        } else if (strcmp(key, "cleanup_model") == 0) {
+            snprintf(cfg->cleanup_model, sizeof(cfg->cleanup_model), "%s", val);
+        } else if (strcmp(key, "cleanup_timeout_ms") == 0) {
+            cfg->cleanup_timeout_ms = atoi(val);
+        } else if (strcmp(key, "vocabulary_file") == 0) {
+            snprintf(cfg->vocabulary_file, sizeof(cfg->vocabulary_file), "%s", val);
         } else if (strcmp(key, "endpoint_url") == 0) {
             snprintf(cfg->endpoint_url, sizeof(cfg->endpoint_url), "%s", val);
         } else if (strcmp(key, "model") == 0) {
@@ -297,6 +316,10 @@ int config_load(config *cfg, const char *path)
     size_t ulen = strlen(cfg->endpoint_url);
     while (ulen > 0 && cfg->endpoint_url[ulen - 1] == '/')
         cfg->endpoint_url[--ulen] = '\0';
+
+    size_t clen = strlen(cfg->cleanup_endpoint_url);
+    while (clen > 0 && cfg->cleanup_endpoint_url[clen - 1] == '/')
+        cfg->cleanup_endpoint_url[--clen] = '\0';
 
     apply_env_overrides(cfg);
     return rc;

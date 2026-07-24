@@ -50,6 +50,39 @@ live = off
 # /usr/local/share/scribe/models/streaming-zipformer-en.
 live_model_dir =
 
+# --- cleanup ---
+# Off by default. Pass each transcript through a local instruction model that
+# fixes what speech does and writing does not: it drops "um" and "uh", resolves
+# a spoken correction, adds punctuation and capitals. It changes nothing else --
+# the words stay yours.
+#
+#   you say:   "Hey, let's meet at 5pm on Monday, uh, no 5pm on tuesday"
+#   you get:   "Hey, let's meet at 5pm on Tuesday."
+#
+# The raw transcript appears first, then scribe backspaces over it and types the
+# corrected one when the model answers -- the same swap the live preview uses, so
+# it needs a backend that can erase (wlr-vk or uinput, not clipboard). If the
+# model does not answer within cleanup_timeout_ms, the raw transcript stands.
+#
+# Local only. The endpoint has to be on this machine: scribe refuses to start if
+# cleanup_endpoint_url points anywhere else, so turning this on cannot quietly
+# start uploading everything you dictate. Any OpenAI-compatible chat server
+# works; the default is Ollama's port. To get one running:
+#   ollama serve
+#   ollama pull qwen2.5:3b-instruct     # then set cleanup_model below
+#
+# One caveat worth knowing: if you move the caret or type during the moment
+# between the raw text and the correction, the backspaces land in the wrong
+# place. The timeout is short to keep that window small.
+cleanup = off
+cleanup_endpoint_url = http://localhost:11434/v1
+cleanup_model =
+cleanup_timeout_ms = 2500
+# Words the model should spell correctly -- names, jargon, project terms -- one
+# per line, '#' for comments. Empty = ~/.config/scribe/vocabulary.txt if it
+# exists. A missing file is fine; it just means no extra vocabulary.
+vocabulary_file =
+
 # --- openai ---
 # Required when engine = openai; ignored otherwise. scribe will not start
 # without a key. Get one at https://platform.openai.com/api-keys

@@ -48,6 +48,19 @@ void live_feed(const int16_t *samples, size_t n_samples);
  * injector, so waiting for it is what keeps two threads from typing at once. */
 void live_commit(const char *final_text);
 
+/* Puts `text` on screen but keeps owning it, so a following commit replaces
+ * only the tail that changed rather than erasing and retyping the lot. Used for
+ * the raw transcript while the cleanup model is still thinking. Returns a
+ * generation token to hand back to live_commit_staged; also blocks until the
+ * text is on screen, and for the same reason live_commit does. */
+unsigned live_stage(const char *text);
+
+/* Replaces the staged text with `final_text` and hands it to the user -- unless
+ * a newer utterance has begun since `gen` was issued by live_stage, in which
+ * case the raw text already on screen stands and the correction is dropped.
+ * Blocks until the swap (or the drop) is done. */
+void live_commit_staged(const char *final_text, unsigned gen);
+
 void live_shutdown(void);
 
 #endif

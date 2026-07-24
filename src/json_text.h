@@ -18,4 +18,14 @@
  * if absent. Caller frees. */
 char *json_extract_string(const char *json, const char *key);
 
+/* Escapes `s` for use as a JSON string value, without the surrounding quotes.
+ * The control characters get their short escapes (\", \\, \n, \r, \t, \b, \f);
+ * any other byte below 0x20 becomes \uXXXX. Bytes at or above 0x20, including
+ * every byte of a UTF-8 sequence, pass through untouched. Returns a malloc'd
+ * string the caller frees, or NULL on allocation failure.
+ *
+ * The inverse of parse_string() in json_text.c, so a string escaped here and
+ * decoded there comes back unchanged. */
+char *json_escape_string(const char *s);
+
 #endif

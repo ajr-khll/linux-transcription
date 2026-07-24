@@ -17,6 +17,8 @@ import Gio from "gi://Gio";
 export const KEYS = [
     "hotkey", "source", "engine", "model_dir", "threads",
     "live", "live_model_dir",
+    "cleanup", "cleanup_endpoint_url", "cleanup_model", "cleanup_timeout_ms",
+    "vocabulary_file",
     "endpoint_url", "model", "api_key",
     "backend", "layout", "variant", "paste_chord",
     "history", "history_dir",
@@ -48,6 +50,12 @@ export function defaults() {
          * guess into whatever window has focus. */
         live: "off",
         live_model_dir: "",
+        /* Matches the daemon's default: off, and local when on. */
+        cleanup: "off",
+        cleanup_endpoint_url: "http://localhost:11434/v1",
+        cleanup_model: "",
+        cleanup_timeout_ms: "2500",
+        vocabulary_file: "",
         endpoint_url: "https://api.openai.com/v1",
         model: "whisper-1",
         api_key: "",
@@ -139,6 +147,19 @@ threads = ${cfg.threads}
 live = ${cfg.live}
 # empty = /usr/local/share/scribe/models/streaming-zipformer-en
 live_model_dir = ${cfg.live_model_dir}
+
+# --- cleanup ---
+# on = fix each transcript with a local instruction model: drop "um"/"uh",
+# resolve spoken self-corrections ("Monday, uh, no Tuesday" -> "Tuesday"), add
+# punctuation. Off by default. The endpoint must be on this machine -- the
+# daemon refuses a remote one, so nothing spoken leaves the computer.
+cleanup = ${cfg.cleanup}
+cleanup_endpoint_url = ${cfg.cleanup_endpoint_url}
+cleanup_model = ${cfg.cleanup_model}
+# how long to wait for the model before keeping the raw transcript, in ms
+cleanup_timeout_ms = ${cfg.cleanup_timeout_ms}
+# terms to spell correctly, one per line; empty = ~/.config/scribe/vocabulary.txt
+vocabulary_file = ${cfg.vocabulary_file}
 
 # --- openai ---
 # Required when engine = openai. Get one at https://platform.openai.com/api-keys

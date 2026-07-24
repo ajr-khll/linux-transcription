@@ -33,6 +33,15 @@ typedef struct {
     bool live;
     char live_model_dir[512];           /* empty = installed default */
 
+    /* Clean up each transcript with a local instruction model: drop fillers,
+     * resolve spoken self-corrections, add punctuation. Off unless asked for,
+     * and refused at startup against a non-local endpoint -- see polish.c. */
+    bool cleanup;
+    char cleanup_endpoint_url[512];     /* OpenAI-compatible chat server, on this host */
+    char cleanup_model[128];
+    int  cleanup_timeout_ms;            /* how long to wait before keeping the raw text */
+    char vocabulary_file[512];          /* empty = ~/.config/scribe/vocabulary.txt */
+
     char endpoint_url[512];             /* openai: server to POST to */
     char model[128];
     char api_key[256];                  /* empty for a local server */

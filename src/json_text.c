@@ -126,6 +126,56 @@ static char *parse_string(const char **p)
     return out;
 }
 
+char *json_escape_string(const char *s)
+{
+    size_t cap = 64, len = 0;
+    char *out = malloc(cap);
+    if (!out)
+        return NULL;
+
+    for (const unsigned char *p = (const unsigned char *)s; *p; p++) {
+        /* Worst case one input byte yields six (\uXXXX), plus the NUL. */
+        if (len + 7 > cap) {
+            cap *= 2;
+            char *q = realloc(out, cap);
+            if (!q) {
+                free(out);
+                return NULL;
+            }
+            out = q;
+        }
+
+        switch (*p) {
+        case '"':  out[len++] = '\\'; out[len++] = '"';  break;
+        case '\\': out[len++] = '\\'; out[len++] = '\\'; break;
+        case '\b': out[len++] = '\\'; out[len++] = 'b';  break;
+        case '\f': out[len++] = '\\'; out[len++] = 'f';  break;
+        case '\n': out[len++] = '\\'; out[len++] = 'n';  break;
+        case '\r': out[len++] = '\\'; out[len++] = 'r';  break;
+        case '\t': out[len++] = '\\'; out[len++] = 't';  break;
+        default:
+            if (*p < 0x20) {
+                /* Any other control byte, spelled out. sprintf writes its own
+                 * NUL after the six characters, which the next iteration or the
+                 * final terminator overwrites. */
+                static const char hex[] = "0123456789abcdef";
+                out[len++] = '\\';
+                out[len++] = 'u';
+                out[len++] = '0';
+                out[len++] = '0';
+                out[len++] = hex[*p >> 4];
+                out[len++] = hex[*p & 0xF];
+            } else {
+                /* Printable ASCII and every UTF-8 continuation byte alike. */
+                out[len++] = (char)*p;
+            }
+        }
+    }
+
+    out[len] = '\0';
+    return out;
+}
+
 char *json_extract_string(const char *json, const char *key)
 {
     const char *p = json;

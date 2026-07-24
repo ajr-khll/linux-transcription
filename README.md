@@ -31,6 +31,7 @@ for every install that predates Parakeet. Reach for `openai` when you need one o
 | in-memory WAV + multipart POST + JSON parse | done |
 | on-device Parakeet via sherpa-onnx (`WITH_PARAKEET=1`) | done |
 | live preview, corrected on release (`live = on`, opt-in) | done |
+| semantic cleanup via a local LLM (`cleanup = on`, opt-in) | done |
 | `wlr-vk` backend (Hyprland/Sway/river/Wayfire) | done |
 | `clipboard` backend (universal fallback) | done |
 | `uinput-layout` backend (GNOME/KDE direct typing) | done |
@@ -212,6 +213,35 @@ Verify with `stat -c '%n %U:%G %a' /dev/uinput /dev/input/event0`; if the group 
 `input`, install `udev/99-scribe.rules` — see the comments in that file. (scribe
 opens `/dev/uinput` write-only, so the common `0620` mode is fine.)
 
+## Cleaning up transcripts
+
+Speech is not writing. You say *"let's meet at 5pm on Monday, uh, no 5pm on tuesday"*
+and mean *"Let's meet at 5pm on Tuesday."* With `cleanup = on`, scribe passes each
+transcript through a local instruction model that drops fillers, resolves a spoken
+self-correction, and adds punctuation — without rephrasing. The words stay yours.
+
+The raw transcript is typed first; when the model answers, scribe backspaces over it and
+types the corrected version — the same swap the live preview uses, so it needs a
+backend that can erase (`wlr-vk` or `uinput`, not `clipboard`). If the model
+does not answer within `cleanup_timeout_ms`, the raw transcript stands. Nothing is ever
+held back waiting on it.
+
+**Local only.** The endpoint must be on this machine — scribe refuses to start if
+`cleanup_endpoint_url` points anywhere else — so turning cleanup on cannot quietly start
+uploading everything you dictate. Any OpenAI-compatible chat server works; the default
+is [Ollama][ollama]'s port:
+
+```sh
+ollama serve
+ollama pull qwen2.5:3b-instruct
+```
+
+then set `cleanup = on` and `cleanup_model = qwen2.5:3b-instruct`. A `vocabulary_file`
+(default `~/.config/scribe/vocabulary.txt`, one term per line) lists names and jargon
+the model should spell correctly.
+
+[ollama]: https://ollama.com
+
 ## Configure
 
 `~/.config/scribe/config.ini`, mode `0600`. See `config.ini.example`.
@@ -366,6 +396,9 @@ Force one with `backend = wlr-vk | uinput | clipboard`.
 - `clipboard` overwrites the clipboard without restoring it.
 - One `paste_chord` applies to every app, so a value tuned for terminals behaves oddly
   in GUI apps.
+- With `cleanup = on`, if you move the caret or type in the moment between the raw
+  transcript and its correction, the backspaces land in the wrong place. The timeout is
+  short to keep that window small.
 
 `TODO.md` has the full list.
 
